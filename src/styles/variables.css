@@ -1,0 +1,144 @@
+/* ── variables.css ── */
+/* Import this once in main.jsx or App.css : import './styles/variables.css' */
+
+:root {
+  /* ── Backgrounds ── */
+  --color-background-primary:   #ffffff;
+  --color-background-secondary: #f5f5f3;
+  --color-background-tertiary:  #eeede9;
+
+  --color-background-info:      #E6F1FB;
+  --color-background-success:   #EAF3DE;
+  --color-background-warning:   #FAEEDA;
+  --color-background-danger:    #FCEBEB;
+
+  /* ── Text ── */
+  --color-text-primary:         #1a1a18;
+  --color-text-secondary:       #5f5e5a;
+  --color-text-tertiary:        #9a9890;
+
+  --color-text-info:            rgb(255, 117, 14);
+  --color-text-success:         #3B6D11;
+  --color-text-warning:         #854F0B;
+  --color-text-danger:          #A32D2D;
+
+  /* ── Borders ── */
+  --color-border-tertiary:      rgba(0, 0, 0, 0.10);
+  --color-border-secondary:     rgba(0, 0, 0, 0.18);
+  --color-border-primary:       rgba(0, 0, 0, 0.30);
+
+  --color-border-info:          #B5D4F4;
+  --color-border-success:       #C0DD97;
+  --color-border-warning:       #FAC775;
+  --color-border-danger:        #F7C1C1;
+
+  /* ── Typography ── */
+  --font-sans:  "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono:  "JetBrains Mono", "Fira Code", "Menlo", monospace;
+  --font-serif: "Georgia", serif;
+
+  /* ── Accents (app-specific) ── */
+  --color-accent:           #e85d20;
+  --color-accent-hover:     #c94d18;
+  --color-accent-secondary: #6d28d9;
+  --color-accent-secondary-hover: #5b21b6;
+
+  /* ── Radius ── */
+  --border-radius-sm:  4px;
+  --border-radius-md:  8px;
+  --border-radius-lg:  12px;
+  --border-radius-xl:  16px;
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background-primary:   #1c1c1a;
+    --color-background-secondary: #242422;
+    --color-background-tertiary:  #141412;
+
+    --color-background-info:      #042C53;
+    --color-background-success:   #173404;
+    --color-background-warning:   #412402;
+    --color-background-danger:    #501313;
+
+    --color-text-primary:         #f0efeb;
+    --color-text-secondary:       #a8a7a0;
+    --color-text-tertiary:        #6a6960;
+
+    --color-text-info:            rgb(255, 117, 14);
+    --color-text-success:         #97C459;
+    --color-text-warning:         #EF9F27;
+    --color-text-danger:          #F09595;
+
+    --color-border-tertiary:      rgba(255, 255, 255, 0.08);
+    --color-border-secondary:     rgba(255, 255, 255, 0.14);
+    --color-border-primary:       rgba(255, 255, 255, 0.25);
+
+    --color-accent:           #f07040;
+    --color-accent-hover:     #e85d20;
+    --color-accent-secondary: #8b5cf6;
+    --color-accent-secondary-hover: #7c3aed;
+
+    --color-border-info:          #0C447C;
+    --color-border-success:       #27500A;
+    --color-border-warning:       #633806;
+    --color-border-danger:        #791F1F;
+  }
+}
+
+/* ── Ui.module.css tokens (référence EmailManager / Analyticsdashboard) ── */
+/* Ces variables alimentent la librairie de composants partagés UI.jsx        */
+/* (Button, Card, Modal, Table, Badge, StatCard...) — elles n'étaient définies */
+/* nulle part, donc ces composants s'affichaient sans style où qu'ils soient   */
+/* utilisés. Valeurs calquées sur la palette réelle d'Analyticsdashboard.css. */
+:root {
+  --surface:        #ffffff;
+  --surface-2:       #f8fafc;
+  --surface-3:       #f1f5f9;
+  --border:          #e2e8f0;
+  --border-strong:   #cbd5e1;
+  --text-primary:    #1e293b;
+  --text-secondary:  #475569;
+  --text-muted:      #94a3b8;
+  --navy:            #1e293b;
+  --navy-mid:        #334155;
+  --gold:            #ff750e;
+  --gold-pale:       rgba(255, 117, 14, 0.1);
+  --danger:          #dc2626;
+  --danger-bg:       #fef2f2;
+  --success:         #15803d;
+  --success-bg:      #f0fdf4;
+  --warning:         #92400e;
+  --warning-bg:      #fffbeb;
+  --info:            #1d4ed8;
+  --info-bg:         #eff6ff;
+  --slate:           #475569;
+  --shadow-sm:       0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-md:       0 24px 80px rgba(0, 0, 0, 0.25);
+  --radius-sm:       var(--border-radius-sm);
+  --radius-md:       var(--border-radius-md);
+  --radius-lg:       var(--border-radius-lg);
+  --radius-xl:       var(--border-radius-xl);
+  --font-body:       var(--font-sans);
+  --font-display:    var(--font-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface:        #1c1c1a;
+    --surface-2:       #242422;
+    --surface-3:       #2a2a28;
+    --border:          rgba(255, 255, 255, 0.10);
+    --border-strong:   rgba(255, 255, 255, 0.18);
+    --text-primary:    #f0efeb;
+    --text-secondary:  #c8c7c2;
+    --text-muted:      #8a8980;
+    --navy:            #f0efeb;
+    --navy-mid:        #d8d7d2;
+    --danger-bg:       #3a1414;
+    --success-bg:      #14301a;
+    --warning-bg:      #3a2a10;
+    --info-bg:         #12233f;
+  }
+}
