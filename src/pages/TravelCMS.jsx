@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useTravelData } from "../context/TravelDataContext";
+import HeroSlidesManager from "../components/HeroSlidesManager";
+import { parseHeroSlide } from "../services/heroSlides";
 import "../styles/Analyticsdashboard.css";
 import "../styles/TravelCMS.css";
 
 // ─── Schemas (unchanged logic, same as before) ──────────────────────────────
 const SCHEMAS = {
+  hero: {
+    label: "Hero slide", icon: "🎬", custom: true, dataKey: "packages",
+    countOf: (docs) => (docs || []).filter((d) => parseHeroSlide(d)).length,
+  },
   destinations: {
     label: "Destination", actionsKey: "destinationActions", dataKey: "destinations",
     icon: "🗺️",
@@ -203,11 +209,13 @@ export default function TravelCMS() {
         <div className="cms-header-inner">
           <div>
             <h1 className="cms-title">Contenu du site</h1>
-            <p className="cms-subtitle">Destinations, voyages, équipe et avis affichés sur le site public</p>
+            <p className="cms-subtitle">Hero, destinations, voyages, équipe et avis affichés sur le site public</p>
           </div>
-          <button className="em-primary-btn" onClick={openCreate}>
-            + Add {schema.label.toLowerCase()}
-          </button>
+          {!schema.custom && (
+            <button className="em-primary-btn" onClick={openCreate}>
+              + Add {schema.label.toLowerCase()}
+            </button>
+          )}
         </div>
 
         <div className="em-categories">
@@ -221,7 +229,9 @@ export default function TravelCMS() {
               >
                 <span>{s.icon}</span>
                 <span>{s.label}s</span>
-                <span className="em-category-count">{(ctx[s.dataKey] ?? []).length}</span>
+                <span className="em-category-count">
+                  {s.countOf ? s.countOf(ctx[s.dataKey]) : (ctx[s.dataKey] ?? []).length}
+                </span>
               </button>
             );
           })}
@@ -233,6 +243,9 @@ export default function TravelCMS() {
       {ctx.error && <p className="cms-status-bar error">⚠ {ctx.error.message}</p>}
 
       <div className="em-main">
+        {schema.custom ? (
+          <HeroSlidesManager />
+        ) : (
         <div className="cms-table-card">
 
           <div className="cms-table-head">
@@ -322,6 +335,7 @@ export default function TravelCMS() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {formRecord !== null && (

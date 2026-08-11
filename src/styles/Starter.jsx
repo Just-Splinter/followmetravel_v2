@@ -8,14 +8,16 @@ import PackagesManager from "../pages/PackagesPage.jsx";
 import { PackageProvider } from "../context/PackagesContext.jsx";
 import { getUserData } from "../services/appwrite.js";
 import { useEffect, useState } from "react";
-import PackageViewerPage from "../pages/PackageViewerPage.jsx";
+import PackagePage from "../marketing/PackagePage.jsx";
 import { PackageViewerProvider } from "../context/PackageViewerContext.jsx";
 import { ReservationProvider } from "../context/ReservationContext.jsx";
 import TravelCMS from "../pages/TravelCMS.jsx";
 import { TravelDataProvider } from "../context/TravelDataContext.jsx";
-import TravelPage from "../components/TravelPageSite.jsx";
+import { LocaleProvider } from "../marketing/i18n.jsx";
+import LandingPage from "../marketing/LandingPage.jsx";
+import MarketingContactPage from "../marketing/ContactPage.jsx";
+import SearchPage from "../marketing/SearchPage.jsx";
 import ReservationsManager from "../components/ReservationsManager.jsx";
-import ToursFilterPage from "../pages/ToursFilterPage.jsx";
 import AuthError from "../communs/AuthError.jsx";
 import AuthCallback from "../communs/AuthCallback.jsx";
 import AnalyticsDashboard from "../pages/Analyticsdashboard.jsx";
@@ -110,6 +112,7 @@ export default function Starter() {
     <AuthProvider>
       <ToastContainer></ToastContainer>
       <BrowserRouter>
+        <LocaleProvider>
         <AnalyticsTracker></AnalyticsTracker>
         <Routes>
           {/* Public routes */}
@@ -120,7 +123,7 @@ export default function Starter() {
             path="/packages/view"
             element={
               <PackageViewerLayout>
-                <PackageViewerPage />
+                <PackagePage />
               </PackageViewerLayout>
             }
           />
@@ -128,15 +131,16 @@ export default function Starter() {
             path="/"
             element={
               <TravelLayout>
-                <TravelPage />
+                <LandingPage />
               </TravelLayout>
             }
           />
+          <Route path="/contact" element={<MarketingContactPage />} />
           <Route
             path="/search"
             element={
               <TravelLayout>
-                <ToursFilterPage />
+                <SearchPage />
               </TravelLayout>
             }
           />
@@ -208,6 +212,7 @@ export default function Starter() {
             <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
           </Route>
         </Routes>
+        </LocaleProvider>
       </BrowserRouter>
     </AuthProvider>
   );

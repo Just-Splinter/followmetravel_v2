@@ -990,11 +990,11 @@
 @keyframes searchBarSlideUp {
   from {
     opacity: 0;
-    transform: translate(-50%, 30px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
 }
 
@@ -1021,16 +1021,29 @@
 
 /* ─── Container ─── */
 .tsb-container {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: -70px;
+  position: relative;
+  margin: 0 auto;
   width: 95%;
   max-width: 960px;
   z-index: 1000;
   animation: searchBarSlideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: 0.6s;
   opacity: 0;
+}
+
+/* Docks the search bar so it straddles the hero's bottom edge and bridges
+   into the destinations section. */
+.dest-search-dock {
+  position: relative;
+  z-index: 10;
+  margin-top: -47px;
+  padding: 0 20px;
+}
+@media (max-width: 1023px) {
+  .dest-search-dock {
+    margin-top: 18px;
+    padding: 0 8px;
+  }
 }
 
 .tsb-bar {
@@ -1415,7 +1428,6 @@
 /* ─── Responsive ─── */
 @media (max-width: 900px) {
   .tsb-container {
-    bottom: 20px;
     width: 94%;
   }
   
@@ -1453,14 +1465,9 @@
 
 @media (max-width: 700px) {
   .tsb-container {
-    position: relative;
-    left: auto;
-    transform: none;
-    bottom: auto;
     width: 100%;
     max-width: 100%;
     padding: 0 16px;
-    margin-top: 24px;
     animation: none;
     opacity: 1;
   }
@@ -1538,7 +1545,7 @@
   .tsb-container {
     animation: none !important;
     opacity: 1 !important;
-    transform: translateX(-50%) !important;
+    transform: none !important;
   }
   
   .tsb-popover,

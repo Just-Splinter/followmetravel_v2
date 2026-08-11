@@ -322,7 +322,10 @@ export default function PackagesManager() {
           ...r,
           data
         };
-      });
+      })
+        // Les slides du hero vivent aussi dans `products` (data.kind === "hero-slide")
+        // mais se gèrent depuis Dashboard → Contenu du site, pas ici.
+        .filter(r => r.data?.kind !== "hero-slide");
       setRawPackages(rows);
     } catch (err) {
       console.error("Erreur chargement packages:", err);

@@ -1,8 +1,12 @@
 import { useState, useMemo } from "react";
 import { useTravelData } from "../context/TravelDataContext";
-import { Footer, Header } from "../sites/commun";
+import Header from "../marketing/Header";
+import { Footer } from "../marketing/Sections";
+import { useLocale } from "../marketing/i18n";
+import "../marketing/marketing.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Grid3x3, List, LayoutList, SlidersHorizontal, MapPin, Star, Clock } from "lucide-react";
+import { isHeroSlideDoc } from "../services/heroSlides";
 import "../styles/ToursFilterPage.css";
 
 
@@ -87,6 +91,7 @@ function ViewModeSwitcher({ mode, onChange }) {
 // ─── Tour Card (Grid View) ────────────────────────────────────────────────────
 function TourCardGrid({ item, index }) {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const data = JSON.parse(item.data || "{}");
   const title = item.title || item.name || "Sans titre";
   const country = item.country || item.destination || "—";
@@ -131,7 +136,7 @@ function TourCardGrid({ item, index }) {
             <div className="tf-grid-card-price">{formatPrice(price)}</div>
             <div className="tf-grid-card-price-sub">/ par personne</div>
           </div>
-          <button className="tf-grid-card-cta">Réserver →</button>
+          <button className="tf-grid-card-cta">{t("card_book")} →</button>
         </div>
       </div>
     </div>
@@ -141,6 +146,7 @@ function TourCardGrid({ item, index }) {
 // ─── Tour Card (List View) ────────────────────────────────────────────────────
 function TourCardList({ item, index }) {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const data = JSON.parse(item.data || "{}");
   const title = item.title || item.name || "Sans titre";
   const country = item.country || item.destination || "—";
@@ -204,7 +210,7 @@ function TourCardList({ item, index }) {
             <div className="tf-list-card-price-sub">/ par personne</div>
           </div>
           <button className="tf-list-card-cta">
-            Réserver <span>→</span>
+            {t("card_book")} <span>→</span>
           </button>
         </div>
       </div>
@@ -215,6 +221,7 @@ function TourCardList({ item, index }) {
 // ─── Tour Card (Compact View) ─────────────────────────────────────────────────
 function TourCardCompact({ item, index }) {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const data = JSON.parse(item.data || "{}");
   const title = item.title || item.name || "Sans titre";
   const country = item.country || item.destination || "—";
@@ -257,7 +264,7 @@ function TourCardCompact({ item, index }) {
         </div>
         <div className="tf-compact-card-footer">
           <div className="tf-compact-card-price">{formatPrice(price)}</div>
-          <button className="tf-compact-card-cta">Voir →</button>
+          <button className="tf-compact-card-cta">{t("card_view")} →</button>
         </div>
       </div>
     </div>
@@ -283,6 +290,7 @@ function FilterChip({ label, onRemove }) {
 
 // ─── Sidebar Content ──────────────────────────────────────────────────────────
 function SidebarContent({ props }) {
+  const { t } = useLocale();
   const {
     search, setSearch,
     destinationId, setDestinationId,
@@ -298,15 +306,15 @@ function SidebarContent({ props }) {
   return (
     <div className="tf-sidebar-content">
       <div className="tf-sidebar-header">
-        <span className="tf-sidebar-title">Filtres</span>
+        <span className="tf-sidebar-title">{t("search_filters")}</span>
         {activeFilterCount > 0 && (
           <button className="tf-sidebar-clear" onClick={resetFilters}>
-            Tout effacer ({activeFilterCount})
+            {t("flt_clear")} ({activeFilterCount})
           </button>
         )}
       </div>
 
-      <Accordion title="Recherche">
+      <Accordion title={t("flt_search")}>
         <div className="tf-input-search-wrap">
           <span className="tf-input-search-icon">🔍</span>
           <input
@@ -318,13 +326,13 @@ function SidebarContent({ props }) {
         </div>
       </Accordion>
 
-      <Accordion title="Destination">
+      <Accordion title={t("flt_dest")}>
         <select
           className="tf-select"
           value={destinationId}
           onChange={(e) => setDestinationId(e.target.value)}
         >
-          <option value="">Toutes les destinations</option>
+          <option value="">{t("flt_all")}</option>
           {(destinations || []).map((d) => (
             <option key={d.$id} value={d.$id}>
               {d.name || d.nom}
@@ -333,7 +341,7 @@ function SidebarContent({ props }) {
         </select>
       </Accordion>
 
-      <Accordion title="Budget (MAD)">
+      <Accordion title={t("flt_budget")}>
         <div className="tf-price-row">
           <input
             type="number"
@@ -355,7 +363,7 @@ function SidebarContent({ props }) {
         </div>
       </Accordion>
 
-      <Accordion title="Note minimale" defaultOpen={false}>
+      <Accordion title={t("flt_rating")} defaultOpen={false}>
         <div className="tf-rating-row">
           {[0, 3, 4, 5].map((n) => (
             <button
@@ -370,7 +378,7 @@ function SidebarContent({ props }) {
       </Accordion>
 
       {tours && tours.length > 0 && (
-        <Accordion title="Types de tours" defaultOpen={false}>
+        <Accordion title={t("flt_tours")} defaultOpen={false}>
           {tours.map((t) => (
             <CheckItem
               key={t.$id}
@@ -383,7 +391,7 @@ function SidebarContent({ props }) {
       )}
 
       {adventures && adventures.length > 0 && (
-        <Accordion title="Aventures" defaultOpen={false}>
+        <Accordion title={t("flt_adv")} defaultOpen={false}>
           {adventures.map((a) => (
             <CheckItem
               key={a.$id}
@@ -397,7 +405,7 @@ function SidebarContent({ props }) {
 
       {activeFilterCount > 0 && (
         <button className="tf-reset-btn" onClick={resetFilters}>
-          Réinitialiser les filtres
+          {t("flt_reset")}
         </button>
       )}
     </div>
@@ -407,6 +415,7 @@ function SidebarContent({ props }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ToursFilterPage() {
   const { packages, destinations, tours, adventures, loading } = useTravelData();
+  const { t } = useLocale();
   const [searchParams] = useSearchParams();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -450,7 +459,7 @@ export default function ToursFilterPage() {
   ].filter(Boolean).length;
 
   const results = useMemo(() => {
-    let list = [...(packages || [])];
+    let list = (packages || []).filter((p) => !isHeroSlideDoc(p));
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -516,10 +525,10 @@ export default function ToursFilterPage() {
       return (
         <div className="tf-empty">
           <div className="tf-empty-icon">🧭</div>
-          <p className="tf-empty-title">Aucun séjour trouvé</p>
-          <p className="tf-empty-text">Essayez d'élargir vos critères de recherche.</p>
+          <p className="tf-empty-title">{t("flt_empty")}</p>
+          <p className="tf-empty-text">{t("flt_widen")}</p>
           <button className="tf-empty-btn" onClick={resetFilters}>
-            Réinitialiser les filtres
+            {t("flt_reset")}
           </button>
         </div>
       );
@@ -545,14 +554,18 @@ export default function ToursFilterPage() {
   };
 
   return (
-    <section className="tf-page">
+    <section className="mk tf-page" style={{ background: "var(--paper)" }}>
       <Header />
+      <div className="mk-wrap mk-page-head" style={{ paddingBottom: 20 }}>
+        <span className="mk-eyebrow">{t("dest_eyebrow")}</span>
+        <h1 className="mk-h2" style={{ margin: "16px 0 0" }}>{t("search_title")}</h1>
+      </div>
 
       {/* Mobile filter bar */}
       <div className="tf-mobile-filter-bar">
         <button className="tf-mobile-filter-btn" onClick={() => setSidebarOpen(true)}>
           <SlidersHorizontal size={16} />
-          Filtres
+          {t("search_filters")}
           {activeFilterCount > 0 && (
             <span className="tf-mobile-filter-count">{activeFilterCount}</span>
           )}
@@ -563,12 +576,12 @@ export default function ToursFilterPage() {
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
         >
-          <option value="default">Trier par</option>
-          <option value="price_asc">Prix ↑</option>
-          <option value="price_desc">Prix ↓</option>
-          <option value="rating">Mieux notés</option>
-          <option value="duration">Durée</option>
-          <option value="name">Nom A–Z</option>
+          <option value="default">{t("sort_by")}</option>
+          <option value="price_asc">{t("sort_price_asc")}</option>
+          <option value="price_desc">{t("sort_price_desc")}</option>
+          <option value="rating">{t("sort_rating")}</option>
+          <option value="duration">{t("sort_duration")}</option>
+          <option value="name">{t("sort_name")}</option>
         </select>
       </div>
 
@@ -601,11 +614,8 @@ export default function ToursFilterPage() {
           <div>
             <div className="tf-results-header">
               <div>
-                <h1 className="tf-results-title">Nos Séjours</h1>
-                <p className="tf-results-count">
-                  {loading
-                    ? "Chargement…"
-                    : `${results.length} séjour${results.length !== 1 ? "s" : ""} disponible${results.length !== 1 ? "s" : ""}`}
+                <p className="tf-results-count" style={{ fontSize: 14 }}>
+                  {loading ? "…" : `${results.length} ${t("search_results")}`}
                 </p>
               </div>
               <div className="tf-header-controls">
@@ -615,12 +625,12 @@ export default function ToursFilterPage() {
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                 >
-                  <option value="default">Trier par défaut</option>
-                  <option value="price_asc">Prix croissant</option>
-                  <option value="price_desc">Prix décroissant</option>
-                  <option value="rating">Mieux notés</option>
-                  <option value="duration">Durée</option>
-                  <option value="name">Nom A–Z</option>
+                  <option value="default">{t("sort_by")}</option>
+                  <option value="price_asc">{t("sort_price_asc")}</option>
+                  <option value="price_desc">{t("sort_price_desc")}</option>
+                  <option value="rating">{t("sort_rating")}</option>
+                  <option value="duration">{t("sort_duration")}</option>
+                  <option value="name">{t("sort_name")}</option>
                 </select>
               </div>
             </div>

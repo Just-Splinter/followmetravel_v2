@@ -1302,12 +1302,12 @@ function ItineraryTimeline({ pkg }) {
   }
 
   return (
-    <>      
+    <>
       <div className="pv-card">
         <h2 className="pv-card-title">
           {pkg.itineraryTitle || "Programme du voyage"}
         </h2>
-        
+
         <p className="pv-text" style={{ marginBottom: 24 }}>
           Découvrez jour par jour votre itinéraire et les expériences qui vous attendent.
         </p>
@@ -1351,9 +1351,9 @@ function ItineraryTimeline({ pkg }) {
                   <div className="pv-timeline-day-label">
                     Jour {day.num || (idx + 1).toString().padStart(2, '0')}
                   </div>
-                  
+
                   <h3 className="pv-timeline-title">{day.title}</h3>
-                  
+
                   {day.theme && (
                     <div className="pv-timeline-theme">
                       {day.theme}
@@ -1547,7 +1547,7 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
     setSaveState("saving");
     try {
       const result = await updatePackage(pkg.$id, {
-        ...pkg,
+        //...pkg,
         data: JSON.stringify(selected),
       });
       setSaveState("success");
@@ -1568,7 +1568,7 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
         <PaletteSidebar pkg={selected} update={update} onClose={onClose} />
       )}
 
-     
+
 
       <div className={`ed-preview-panel ${previewMode ? "fullscreen" : ""}`}>
         {previewMode && (

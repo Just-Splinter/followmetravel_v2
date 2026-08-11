@@ -3,7 +3,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "../styles/FollowMeTravel.css";
 import { useTravelData } from "../context/TravelDataContext";
-import ScrollToTop, { DestinationCard, Footer, Hero } from "../sites/commun";
+import ScrollToTop, { DestinationCard, Footer } from "../sites/commun";
+import HeroFoxico from "./HeroFoxico";
+import { heroSlidesFromPackages, fallbackHeroSlides, isHeroSlideDoc } from "../services/heroSlides";
 import { useNavigate } from "react-router-dom";
 import { useEvents } from "../context/EventsContext";
 import { Modal } from "./UI";
@@ -1403,7 +1405,12 @@ export default function TravelPage() {
     packages,
   } = useTravelData();
 
-  const maxIndex = Math.max(0, packages.length - itemsPerPage);
+  // Hero slides come from the products collection (data.kind === "hero-slide");
+  // fall back to the built-in set until the backend is seeded from the CMS.
+  const heroSlides = heroSlidesFromPackages(packages);
+  const displayedPackages = packages.filter((p) => !isHeroSlideDoc(p));
+
+  const maxIndex = Math.max(0, destinations.length - itemsPerPage);
 
   const isPrevDisabled = currentIndex === 0;
   const isNextDisabled = currentIndex >= maxIndex;
@@ -1451,20 +1458,24 @@ export default function TravelPage() {
     <div style={styles.pageWrapper}>
       <ScrollToTop />
 
-      <img
-        src="https://png.pngtree.com/png-vector/20250320/ourmid/pngtree-realistic-passenger-airplane-in-mid-flight-isolated-on-transparent-background-png-image_15788014.png"
-        className="plane"
-      />
       {/* Back to top */}
       {scrolled && (
         <button onClick={scrollToTop} style={styles.backToTop} aria-label="Back to top">↑</button>
       )}
 
       {/* Hero */}
-      <Hero></Hero>
+      <HeroFoxico slides={heroSlides.length ? heroSlides : fallbackHeroSlides()} />
 
-      {/* Popular Destinations */}
-      <section style={{ ...styles.sectionPadding, background: "#fff" }} id="destination">
+      {/* Popular Destinations — blends out of the hero */}
+      <section
+        id="destination"
+        style={{
+          position: "relative",
+          padding: "0 0 90px",
+          background:
+            "radial-gradient(760px 260px at 50% 20px, rgba(255,117,14,0.10), rgba(255,117,14,0) 72%), linear-gradient(180deg, #fff3e8 0%, #fffdfb 420px, #ffffff 100%)",
+        }}
+      >
         {/* AI box */}
         {/* Booking Bar */}
         {aiOpenDraft && <div
@@ -1508,30 +1519,35 @@ export default function TravelPage() {
             ))}
           </div>
         </div>}
-        <TravelSearchBar></TravelSearchBar>
+        <div className="dest-search-dock">
+          <TravelSearchBar></TravelSearchBar>
+        </div>
 
-        <div style={styles.container}>
+        <div style={{ ...styles.container, paddingTop: 84 }}>
           <div style={styles.sectionTitleArea}>
             <div>
-              <span style={styles.subTitle}>Popular Destination</span>
-              <h2 style={styles.sectionH2}>Our Popular<br />Destination</h2>
-              <p style={styles.sectionDesc}>Nous donnons une dimension aventureuse à vos voyages, en vous proposant des destinations de plein air partout dans le monde.
+              <span style={{ ...styles.subTitle, fontFamily: "'Poppins', sans-serif" }}>Popular Destination</span>
+              <h2 style={{ ...styles.sectionH2, fontFamily: "'Poppins', sans-serif", fontWeight: 700, letterSpacing: "-1px", color: "#1a1a2e" }}>Our Popular<br />Destination</h2>
+              <p style={{ ...styles.sectionDesc, fontFamily: "'Poppins', sans-serif", fontSize: 14, lineHeight: 1.75 }}>Nous donnons une dimension aventureuse à vos voyages, en vous proposant des destinations de plein air partout dans le monde.
                 Commencez votre aventure dès maintenant !</p>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 12 }}>
               <button
                 onClick={prev}
                 disabled={isPrevDisabled}
+                aria-label="Précédent"
                 style={{
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
                   borderRadius: "50%",
-                  border: "1px solid rgb(255 117 14)",
-                  background: isPrevDisabled ? "#f5f5f5" : "transparent",
-                  color: isPrevDisabled ? "#bbb" : "rgb(255 117 14)",
+                  border: "1.5px solid rgba(255,117,14,0.55)",
+                  background: "#fff",
+                  color: isPrevDisabled ? "#d8cfc6" : "#ff750e",
+                  borderColor: isPrevDisabled ? "#eee2d6" : "rgba(255,117,14,0.55)",
                   cursor: isPrevDisabled ? "not-allowed" : "pointer",
-                  opacity: isPrevDisabled ? 0.6 : 1,
-                  transition: "0.3s"
+                  fontSize: 16,
+                  boxShadow: "0 6px 16px rgba(26,26,46,0.06)",
+                  transition: "0.3s",
                 }}
               >
                 ←
@@ -1540,18 +1556,20 @@ export default function TravelPage() {
               <button
                 onClick={next}
                 disabled={isNextDisabled}
+                aria-label="Suivant"
                 style={{
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
                   borderRadius: "50%",
                   border: "none",
                   background: isNextDisabled
-                    ? "#ddd"
-                    : "rgb(255 117 14)",
+                    ? "#eee2d6"
+                    : "linear-gradient(135deg, #ff750e, #ff8c3c)",
                   color: "#fff",
                   cursor: isNextDisabled ? "not-allowed" : "pointer",
-                  opacity: isNextDisabled ? 0.6 : 1,
-                  transition: "0.3s"
+                  fontSize: 16,
+                  boxShadow: isNextDisabled ? "none" : "0 10px 22px rgba(255,117,14,0.35)",
+                  transition: "0.3s",
                 }}
               >
                 →
@@ -1613,7 +1631,7 @@ export default function TravelPage() {
               Des montagnes majestueuses aux plages paradisiaques, découvrez des expériences uniques soigneusement sélectionnées pour les amoureux du voyage et de l'aventure.            </p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "24px", marginTop: "40px" }}>
-            {packages.map((t, i) => <PackageCard key={i} pkg={t} />)}
+            {displayedPackages.map((t, i) => <PackageCard key={i} pkg={t} />)}
           </div>
         </div>
       </section>
@@ -1810,7 +1828,7 @@ export default function TravelPage() {
       {contactOpen && <Modal onClose={() => setContactOpen(false)} >
         <ContactPage></ContactPage>
       </Modal>}
-      {aiOpen && <AIChat destinations={packages} onClose={() => setAiOpen(false)} />}
+      {aiOpen && <AIChat destinations={displayedPackages} onClose={() => setAiOpen(false)} />}
     </div>
   );
 }

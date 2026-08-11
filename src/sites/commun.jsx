@@ -1460,6 +1460,8 @@ export function Hero1() {
   )
 }
 
+// Card language matches the Foxico hero: image-forward, 16px radius, Poppins,
+// white label over a navy gradient, orange accents.
 export function DestinationCard({ dest }) {
   const [hover, setHover] = useState(false);
   const navigate = useNavigate();
@@ -1469,24 +1471,22 @@ export function DestinationCard({ dest }) {
       onMouseEnter={() => setHover(true)}
       onClick={() => {
         navigate(`/search?dest=${dest.$id}`);
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }}
       onMouseLeave={() => setHover(false)}
       style={{
         position: "relative",
-        width: 340,
-        height: 470,
-        borderRadius: 28,
+        width: "100%",
+        height: 440,
+        borderRadius: 16,
         overflow: "hidden",
         cursor: "pointer",
-        transition: "0.45s",
-        transform: hover ? "translateY(-12px)" : "translateY(0px)",
+        fontFamily: "'Poppins', sans-serif",
+        transition: "transform .45s cubic-bezier(.22,1,.36,1), box-shadow .45s",
+        transform: hover ? "translateY(-10px)" : "translateY(0px)",
         boxShadow: hover
-          ? "0 35px 70px rgba(0,0,0,.18)"
-          : "0 10px 25px rgba(0,0,0,.08)",
+          ? "0 30px 60px rgba(26,26,46,.22)"
+          : "0 16px 36px rgba(26,26,46,.12)",
       }}
     >
       <img
@@ -1496,135 +1496,92 @@ export function DestinationCard({ dest }) {
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          transition: "1s",
+          transition: "transform 1s cubic-bezier(.22,1,.36,1)",
           transform: hover ? "scale(1.08)" : "scale(1)",
         }}
       />
 
+      {/* Navy gradient, same family as the hero overlay */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(to top,rgba(0,0,0,.15),transparent 40%)",
+            "linear-gradient(to top, rgba(10,12,28,.82) 0%, rgba(10,12,28,.28) 38%, rgba(10,12,28,0) 62%)",
         }}
       />
 
-      {/* Rating */}
-
+      {/* Rating pill — echoes the hero bookmark chip */}
       <div
         style={{
           position: "absolute",
-          top: 18,
-          left: 18,
+          top: 16,
+          left: 16,
           background: "#fff",
-          borderRadius: 999,
-          padding: "10px 18px",
+          borderRadius: 12,
+          padding: "8px 14px",
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          boxShadow: "0 10px 25px rgba(0,0,0,.08)",
+          gap: 6,
+          boxShadow: "0 6px 16px rgba(0,0,0,.18)",
           transition: ".3s",
           transform: hover ? "scale(1.05)" : "scale(1)",
         }}
       >
-        <span
-          style={{
-            color: "#ff6b00",
-            fontSize: 20,
-          }}
-        >
-          ★
-        </span>
-
-        <span
-          style={{
-            fontWeight: 700,
-            fontSize: 20,
-          }}
-        >
-          5
+        <span style={{ color: "#ff750e", fontSize: 15, lineHeight: 1 }}>★</span>
+        <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>
+          {dest.rating || "5"}
         </span>
       </div>
 
-      {/* Card */}
-
-      <div
-        style={{
-          position: "absolute",
-          left: 25,
-          right: 25,
-          bottom: 25,
-
-          background: "#fff",
-
-          borderRadius: 22,
-
-          padding: 30,
-
-          transition: ".45s",
-
-          transform: hover
-            ? "translateY(-8px)"
-            : "translateY(0px)",
-
-          boxShadow: "0 15px 40px rgba(0,0,0,.12)",
-        }}
-      >
-        <h2
+      {/* Label block, hero-card style */}
+      <div style={{ position: "absolute", left: 22, right: 22, bottom: 20 }}>
+        <h3
           style={{
             margin: 0,
-            fontSize: 34,
-            fontWeight: 700,
-            color: "#081B37",
+            fontSize: 26,
+            fontWeight: 600,
+            color: "#fff",
+            letterSpacing: "-0.3px",
+            textShadow: "0 2px 10px rgba(0,0,0,.35)",
           }}
         >
           {dest.name}
-        </h2>
-
+        </h3>
         <p
           style={{
-            marginTop: 10,
-            color: "#6b7280",
-            fontSize: 22,
+            margin: "5px 0 0",
+            fontSize: 13,
+            color: "rgba(255,255,255,.78)",
           }}
         >
-          {dest.listing} Listings
+          {dest.listing} séjours disponibles
         </p>
 
         <div
           style={{
-            marginTop: 24,
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            marginTop: 14,
+            maxHeight: hover ? 44 : 0,
             opacity: hover ? 1 : 0,
-            transition: ".35s",
+            transform: hover ? "translateY(0)" : "translateY(8px)",
+            transition: ".4s cubic-bezier(.22,1,.36,1)",
+            overflow: "hidden",
           }}
         >
           <span
             style={{
-              color: "#ff7b00",
-              fontWeight: 700,
-              fontSize: 18,
-            }}
-          >
-            From $499
-          </span>
-
-          <button
-            style={{
-              border: "none",
-              background: "#ff7b00",
+              background: "linear-gradient(135deg, #ff750e, #ff8c3c)",
               color: "#fff",
-              padding: "10px 18px",
+              padding: "10px 20px",
               borderRadius: 999,
-              cursor: "pointer",
+              fontSize: 13,
               fontWeight: 600,
+              boxShadow: "0 10px 22px rgba(255,117,14,.4)",
             }}
           >
-            Explore →
-          </button>
+            Explorer →
+          </span>
         </div>
       </div>
     </div>
