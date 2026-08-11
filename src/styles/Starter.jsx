@@ -22,7 +22,7 @@ import AuthError from "../communs/AuthError.jsx";
 import AuthCallback from "../communs/AuthCallback.jsx";
 import AnalyticsDashboard from "../pages/Analyticsdashboard.jsx";
 import { useEvents } from "../context/EventsContext.jsx";
-import UserProfilePage from "../pages/Userprofilepage.jsx";
+import ProfilePage from "../marketing/ProfilePage.jsx";
 import { ToastContainer } from 'react-toastify';
 import MetaAds from "../components/MetaAds.jsx";
 import EmailManager from "../pages/Emailmanager.jsx";
@@ -148,7 +148,7 @@ export default function Starter() {
             path="/profil"
             element={
               <TravelLayout>
-                <UserProfilePage />
+                <ProfilePage />
               </TravelLayout>
             }
           />

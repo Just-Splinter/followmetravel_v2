@@ -3429,28 +3429,29 @@ body:has(.mk) .grecaptcha-badge {
   background: var(--line-soft);
   margin-block: 8px;
 }
-.mk-hsearch-fieldbtn {
+.mk .mk-hsearch-fieldbtn {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 11px 16px;
+  padding: 12px 14px;
   text-align: start;
   color: var(--ink-2);
   border-radius: 14px;
 }
-.mk-hsearch-fieldbtn > svg {
+/* leading icon: dead-centered on the pill (reference behaviour), fixed box */
+.mk-hsearch-fieldbtn > svg:first-child {
   flex: 0 0 16px;
   width: 16px;
-  align-self: flex-end;
-  margin-block-end: 3px;
+  height: 16px;
 }
+/* trailing caret: pushed to the end with its own clear gutter on BOTH sides */
 .mk-hsearch-fieldbtn > svg:last-child {
-  flex-basis: 13px;
+  flex: 0 0 13px;
   width: 13px;
+  height: 13px;
   margin-inline-start: auto;
-  align-self: center;
-  margin-block-end: 0;
+  margin-inline-end: 6px;
 }
 .mk-hsearch-fb-main {
   flex: 1;
@@ -3820,6 +3821,246 @@ body:has(.mk) .grecaptcha-badge {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+}
+
+/* ─── Profile / user space ──────────────────────────────────────────────── */
+.mk-pf-gate {
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 56px 28px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+.mk-pf-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 30px;
+}
+.mk-pf-tabs button {
+  padding-block: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+  position: relative;
+  transition: color 200ms;
+}
+.mk-pf-tabs button:hover {
+  color: var(--ink);
+}
+.mk-pf-tabs button.is-active {
+  color: var(--ink);
+  font-weight: 600;
+}
+.mk-pf-tabs button.is-active::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+.mk-pf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mk-pf-card {
+  background: #fffdf9;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  transition: border-color 250ms;
+}
+.mk-pf-card.is-open {
+  border-color: var(--line);
+}
+.mk-pf-card-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  text-align: start;
+  padding: 18px 20px;
+}
+.mk-pf-card-main {
+  flex: 1;
+  min-width: 0;
+}
+.mk-pf-card-main h3 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 20px;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+[dir="rtl"] .mk-pf-card-main h3 {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.mk-pf-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.mk-pf-ref {
+  font-weight: 700;
+  color: var(--accent-deep);
+  letter-spacing: 0.04em;
+}
+.mk-pf-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.mk-pf-total {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.mk-pf-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.mk-pf-badge.is-pending {
+  border-color: rgba(232, 99, 10, 0.4);
+  color: var(--accent-deep);
+}
+.mk-pf-badge.is-ok {
+  border-color: rgba(43, 100, 60, 0.35);
+  color: #2b643c;
+}
+.mk-pf-badge.is-done {
+  background: var(--paper-2);
+  border-color: transparent;
+}
+.mk-pf-badge.is-bad {
+  border-color: rgba(179, 38, 30, 0.35);
+  color: #b3261e;
+}
+.mk-pf-chev {
+  flex-shrink: 0;
+  color: var(--ink-2);
+  transition: transform 250ms var(--ease);
+}
+.mk-pf-card.is-open .mk-pf-chev {
+  transform: rotate(180deg);
+}
+.mk-pf-card-body {
+  border-top: 1px solid var(--line-soft);
+  padding: 16px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.mk-pf-block em {
+  display: block;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+[dir="rtl"] .mk-pf-block em {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+}
+.mk-pf-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13.5px;
+  padding-block: 4px;
+}
+.mk-pf-line b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mk-pf-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mk-pf-tags span {
+  font-size: 12.5px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #fff;
+}
+.mk-pf-profile {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.mk-pf-idrow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.mk-pf-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--serif);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mk-pf-idrow b {
+  display: block;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 20px;
+}
+.mk-pf-idrow span {
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.mk-pf-facts {
+  margin: 0;
+  border-top: 1px solid var(--line-soft);
+}
+.mk-pf-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 13px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14px;
+}
+.mk-pf-facts dt {
+  color: var(--ink-2);
+}
+.mk-pf-facts dd {
+  margin: 0;
+  font-weight: 500;
+  text-align: end;
+}
+.mk-pf-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
 /* Fixed-height hero for full-page captures / previews (`?flat=1`) */
