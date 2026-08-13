@@ -92,36 +92,41 @@ export function LangSwitcher() {
   const { locale, setLocale, t } = useLocale();
   return (
     <div className="mk-lang" role="group" aria-label={t("lang_label")}>
-      {LOCALES.map((l) => (
-        <button
-          key={l.code}
-          className={locale === l.code ? "is-active" : ""}
-          onClick={() => setLocale(l.code)}
-          aria-pressed={locale === l.code}
-          lang={l.code}
-        >
-          {l.short}
-        </button>
+      {LOCALES.map((l, i) => (
+        <span key={l.code} className="mk-lang-item">
+          {i > 0 && <i aria-hidden="true">/</i>}
+          <button
+            className={locale === l.code ? "is-active" : ""}
+            onClick={() => setLocale(l.code)}
+            aria-pressed={locale === l.code}
+            lang={l.code}
+          >
+            {l.short}
+          </button>
+        </span>
       ))}
     </div>
   );
 }
 
 /* ─── Count-up number (for stats) ─────────────────────────────────────────── */
+const FLAT_CAPTURE = new URLSearchParams(window.location.search).has("flat");
+
 export function CountUp({ to, decimals = 0, duration = 1600 }) {
   const ref = useRef(null);
-  const [val, setVal] = useState(0);
+  const [val, setVal] = useState(FLAT_CAPTURE ? to : 0);
   const started = useRef(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    if (FLAT_CAPTURE) return;
     const io = new IntersectionObserver(
       (entries) => {
         if (!entries[0].isIntersecting || started.current) return;
         started.current = true;
         const t0 = performance.now();
         const tick = (now) => {
-          const p = Math.min(1, (now - t0) / duration);
+          const p = Math.min(1, Math.max(0, (now - t0) / duration));
           const eased = 1 - Math.pow(1 - p, 3);
           setVal(to * eased);
           if (p < 1) requestAnimationFrame(tick);

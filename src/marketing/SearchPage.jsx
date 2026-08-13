@@ -216,6 +216,7 @@ export default function SearchPage() {
         ))}
       </div>
 
+      {facet.length > 0 && (
       <section className="mk-sr-block">
         <h4>{t("sr_dests")}</h4>
         <ul className="mk-sr-cols">
@@ -228,6 +229,7 @@ export default function SearchPage() {
           ))}
         </ul>
       </section>
+      )}
 
       {adventures?.length > 0 && (
         <section className="mk-sr-block">
@@ -367,7 +369,7 @@ export default function SearchPage() {
         <Price it={it} />
         <span className="mk-sr-gcard-go"><Arrow size={14} /></span>
       </div>
-      <div style={{ marginTop: 10 }}>
+      <div className="mk-sr-gcard-more">
         <QuickPrice pkgId={it.id} price={it.price} departureDates={it.departureDates} compact />
       </div>
     </article>
@@ -387,8 +389,10 @@ export default function SearchPage() {
   const first = results.length ? (page - 1) * pageSize + 1 : 0;
   const last = Math.min(page * pageSize, results.length);
 
+  const flat = new URLSearchParams(window.location.search).has("flat");
+
   return (
-    <div className="mk">
+    <div className={`mk ${flat ? "mk--flat" : ""}`}>
       <Header />
       <main>
         <div className="mk-wrap mk-page-head" style={{ paddingBottom: 28 }}>

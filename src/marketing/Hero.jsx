@@ -27,7 +27,7 @@ export default function Hero({ slides }) {
       setTimeout(() => {
         setActive(next);
         setTextIn(true);
-      }, 260);
+      }, 220);
     },
     [active, N]
   );
@@ -78,7 +78,7 @@ export default function Hero({ slides }) {
 
   return (
     <section
-      className="mk-hero"
+      className="mk-hero mk-grain"
       id="top"
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
@@ -96,35 +96,29 @@ export default function Hero({ slides }) {
       </div>
 
       <div className="mk-wrap mk-hero-in">
-        <span className="mk-eyebrow">{t("hero_eyebrow")}</span>
+        <div className={`mk-hero-copy ${textIn ? "" : "is-leaving"}`}>
+          <span className="mk-eyebrow">{t("hero_eyebrow")}</span>
 
-        <h1 className="mk-hero-title" key={`t-${active}`}>
-          <span className="mk-line is-in">
-            <span style={{ "--ln-delay": "60ms" }}>{s.name}</span>
-          </span>
-        </h1>
+          <h1 className="mk-hero-title">
+            <span className="mk-line">
+              <span className="mk-rise" key={`t-${active}`}>{s.name}</span>
+            </span>
+          </h1>
 
-        <p
-          className="mk-hero-desc"
-          key={`d-${active}`}
-          style={{
-            opacity: textIn ? 1 : 0,
-            transform: textIn ? "none" : "translateY(8px)",
-            transition: "opacity 600ms ease 250ms, transform 700ms var(--ease) 250ms",
-          }}
-        >
-          {s.description}
-        </p>
+          <p className="mk-hero-desc mk-hero-desc-in" key={`d-${active}`}>
+            {s.description}
+          </p>
 
-        <div style={{ opacity: textIn ? 1 : 0, transition: "opacity 500ms ease 350ms" }}>
-          <a
-            className="mk-alink"
-            href="/search"
-            onClick={(e) => { e.preventDefault(); navigate("/search"); }}
-          >
-            {t("hero_explore")} — {s.name}
-            <Arrow />
-          </a>
+          <div className="mk-hero-link-in" key={`l-${active}`}>
+            <a
+              className="mk-alink"
+              href="/search"
+              onClick={(e) => { e.preventDefault(); navigate("/search"); }}
+            >
+              {t("hero_explore")} — {s.name}
+              <Arrow />
+            </a>
+          </div>
         </div>
       </div>
 

@@ -57,7 +57,7 @@ export function Destinations({ destinations, heroSlides }) {
             </figure>
             <div className="mk-dest-meta">
               <b>★ {d.rating}</b>
-              <span>{t("hero_explore")} →</span>
+              <span className="mk-dest-idx">{String(i + 1).padStart(2, "0")}</span>
             </div>
           </Reveal>
         ))}
@@ -129,9 +129,6 @@ export function Trips({ packages }) {
                 <span className="mk-trip-price">
                   {t("trips_from")}<b>{nf.format(p.price || 0)}</b>DH
                 </span>
-                <span className="mk-trip-view">{t("trips_view")} →</span>
-              </div>
-              <div style={{ marginTop: 12 }}>
                 <QuickPrice pkgId={p.id} price={p.price} departureDates={p.departureDates} compact />
               </div>
             </Reveal>
@@ -228,7 +225,7 @@ export function Adventures({ adventures, heroSlides }) {
   if (!items.length) return null;
 
   return (
-    <section className="mk-section" style={{ paddingTop: 0 }}>
+    <section className="mk-section">
       <div className="mk-wrap">
         <SectionHead eyebrow={t("adv_eyebrow")} title={<Lines text={t("adv_title")} />} />
       </div>
@@ -320,14 +317,14 @@ export function CtaBand() {
   const { t } = useLocale();
   const navigate = useNavigate();
   return (
-    <section className="mk-section mk-cta">
+    <section className="mk-section mk-cta mk-grain">
       <div className="mk-wrap">
         <Reveal as="h2" className="mk-h2">
           {t("cta_line1")}
           {"\n"}
           <em>{t("cta_line2")}</em>
         </Reveal>
-        <Reveal as="p" delay={120}>{t("footer_tag")}</Reveal>
+        <Reveal as="p" delay={120}>{t("cta_sub")}</Reveal>
         <Reveal delay={200}>
           <Button variant="paper" onClick={() => navigate("/contact")}>{t("cta_button")}</Button>
         </Reveal>

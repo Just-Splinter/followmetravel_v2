@@ -53,7 +53,7 @@ export default function Header({ light = false }) {
 
   return (
     <>
-      <header className={`mk-header ${solid ? "is-solid" : ""} ${light ? "is-light" : ""}`}>
+      <header className={`mk-header ${solid ? "is-solid" : ""} ${light ? "is-light" : ""} ${open ? "is-menu" : ""}`}>
         <div className="mk-wrap">
           <div className="mk-header-in">
             <a className="mk-logo" href="/" onClick={(e) => { e.preventDefault(); go("/#top"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>

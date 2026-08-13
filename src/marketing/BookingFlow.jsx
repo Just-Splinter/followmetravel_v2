@@ -22,7 +22,7 @@ const DEFAULT_SUPPLEMENTS = [
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
 
 /* ─── Wizard ─────────────────────────────────────────────────────────────── */
-export default function BookingFlow({ pkg, onClose, prefill }) {
+export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = null }) {
   const { t, locale } = useLocale();
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const { createReservation } = useReservation();
@@ -47,7 +47,7 @@ export default function BookingFlow({ pkg, onClose, prefill }) {
   const ppPrice = Number(pkg.basePrice) || 0;
 
   const [catIdx, setCatIdx] = useState(0);
-  const [dateIdx, setDateIdx] = useState(null);
+  const [dateIdx, setDateIdx] = useState(initialDateIdx);
   const [rooms, setRooms] = useState({}); // {hotelIdx: {roomKey: qty}}
   const [pax, setPax] = useState(() => Math.max(1, Number(prefill?.adults) || 2)); // per-person mode
   const [supp, setSupp] = useState({});
@@ -66,7 +66,7 @@ export default function BookingFlow({ pkg, onClose, prefill }) {
 
   /* Preselect the departure nearest to the date requested in the hero form */
   useEffect(() => {
-    if (!prefill?.date || !dates.length) return;
+    if (initialDateIdx !== null || !prefill?.date || !dates.length) return;
     const wanted = new Date(prefill.date);
     if (isNaN(wanted)) return;
     let best = 0, bestGap = Infinity;
@@ -79,7 +79,16 @@ export default function BookingFlow({ pkg, onClose, prefill }) {
   }, []);
 
   useEffect(() => { setRooms({}); }, [catIdx]);
-  useEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* pricing — same math as the legacy modal (room mode) */
   const { breakdown, baseTotal, totalPax } = useMemo(() => {
@@ -303,7 +312,8 @@ export default function BookingFlow({ pkg, onClose, prefill }) {
                       <div>
                         <b>{h.name}</b>
                         <span>
-                          {h.city ? `${h.city} · ` : ""}{h.stars ? `${h.stars}★` : ""}{h.nights ? ` · ${h.nights} ${t("sr_duration").toLowerCase()}` : ""}
+                          {h.city ? `${h.city} · ` : ""}{h.stars ? `${h.stars}★` : ""}
+                          {h.nights ? ` · ${h.nights} ${Number(h.nights) > 1 ? t("cal_nights") : t("cal_night")}` : ""}
                         </span>
                       </div>
                       <i>{fmt(parsePrice(h.cols?.[0]))} <u>{t("bk_per_pax")}</u></i>
