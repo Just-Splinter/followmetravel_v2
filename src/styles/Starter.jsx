@@ -17,6 +17,7 @@ import { LocaleProvider } from "../marketing/i18n.jsx";
 import LandingPage from "../marketing/LandingPage.jsx";
 import MarketingContactPage from "../marketing/ContactPage.jsx";
 import SearchPage from "../marketing/SearchPage.jsx";
+import OmraPage from "../marketing/OmraPage.jsx";
 import ReservationsManager from "../components/ReservationsManager.jsx";
 import AuthError from "../communs/AuthError.jsx";
 import AuthCallback from "../communs/AuthCallback.jsx";
@@ -35,6 +36,14 @@ const EXCLUDED_ROUTES = [
   "/packages/view",
   "/auth",
 ];
+
+function ScrollReset() {
+  const { pathname } = useLocation();
+  // instant: the global scroll-behavior:smooth turns plain scrollTo into an
+  // animation that async page loads abort mid-flight
+  useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [pathname]);
+  return null;
+}
 
 function AnalyticsTracker() {
   const location = useLocation();
@@ -113,6 +122,7 @@ export default function Starter() {
       <ToastContainer></ToastContainer>
       <BrowserRouter>
         <LocaleProvider>
+        <ScrollReset />
         <AnalyticsTracker></AnalyticsTracker>
         <Routes>
           {/* Public routes */}
@@ -136,6 +146,14 @@ export default function Starter() {
             }
           />
           <Route path="/contact" element={<MarketingContactPage />} />
+          <Route
+            path="/omra"
+            element={
+              <TravelLayout>
+                <OmraPage />
+              </TravelLayout>
+            }
+          />
           <Route
             path="/search"
             element={

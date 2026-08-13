@@ -26,6 +26,7 @@ export default function Header({ light = false }) {
   const links = [
     { k: "nav_destinations", href: "/#destinations" },
     { k: "nav_trips", href: "/#trips" },
+    { k: "nav_omra", href: "/omra", gold: true },
     { k: "nav_about", href: "/#house" },
     { k: "nav_journal", href: "/#testimonials" },
     { k: "nav_contact", href: "/contact" },
@@ -62,7 +63,12 @@ export default function Header({ light = false }) {
 
             <nav className="mk-nav" aria-label="principal">
               {links.map((l) => (
-                <a key={l.k} href={l.href} onClick={(e) => { e.preventDefault(); go(l.href); }}>
+                <a
+                  key={l.k}
+                  href={l.href}
+                  className={l.gold ? "mk-nav-gold" : ""}
+                  onClick={(e) => { e.preventDefault(); go(l.href); }}
+                >
                   {t(l.k)}
                 </a>
               ))}

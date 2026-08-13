@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTravelData } from "../context/TravelDataContext";
 import { isHeroSlideDoc } from "../services/heroSlides";
+import { isOmraDoc } from "../services/omra";
 import { useLocale } from "./i18n";
 import Header from "./Header";
 import { Footer } from "./Sections";
@@ -57,7 +58,7 @@ export default function SearchPage() {
   const items = useMemo(
     () =>
       (packages || [])
-        .filter((p) => !isHeroSlideDoc(p))
+        .filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p))
         .map((p) => {
           const d = parse(p);
           return {

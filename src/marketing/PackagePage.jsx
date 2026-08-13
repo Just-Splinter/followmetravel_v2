@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePackages } from "../context/PackageViewerContext";
 import { ReservationProvider } from "../context/ReservationContext";
@@ -13,6 +13,26 @@ import { resolvePlace } from "./geo";
 import "./marketing.css";
 
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
+
+/* ─── Route timeline leg — a dotted travel route meandering between days.
+   Desktop path swings toward the plate side (the line dives behind the
+   photo); mobile path hugs the leading edge. RTL mirrors both. ─────────── */
+function LegPath({ flip, rtl }) {
+  const dir = (flip ? -1 : 1) * (rtl ? -1 : 1);
+  const bx = 50 + dir * 30;
+  const mb = rtl ? 94 : 6;
+  const ms = mb + (rtl ? -7 : 7);
+  const dDesk = `M 50 0 C 50 22, ${bx} 30, ${bx} 50 C ${bx} 72, 50 80, 50 100`;
+  const dMob = `M ${mb} 0 C ${mb} 26, ${ms} 34, ${ms} 50 C ${ms} 72, ${mb} 80, ${mb} 100`;
+  return (
+    <svg className="mk-pk-leg-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path className="mk-pk-leg-track is-desk" d={dDesk} pathLength="100" vectorEffect="non-scaling-stroke" />
+      <path className="mk-pk-leg-dash is-desk" d={dDesk} pathLength="100" vectorEffect="non-scaling-stroke" />
+      <path className="mk-pk-leg-track is-mob" d={dMob} pathLength="100" vectorEffect="non-scaling-stroke" />
+      <path className="mk-pk-leg-dash is-mob" d={dMob} pathLength="100" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
 
 /* ─── Lightbox ───────────────────────────────────────────────────────────── */
 function Lightbox({ images, index, onClose, onMove }) {
@@ -61,7 +81,8 @@ function ChapHead({ n, title, badge }) {
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 export default function PackagePage() {
   const { fetchById, selectedPkg, loading } = usePackages();
-  const { t, locale } = useLocale();
+  const { t, locale, isRTL } = useLocale();
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const pkgId = searchParams.get("pkgId");
@@ -90,6 +111,67 @@ export default function PackagePage() {
     return [...new Set(list)];
   }, [pkg]);
 
+  // route timeline — a compass marker travels the dotted route as you scroll
+  const routeRef = useRef(null);
+  const markerRef = useRef(null);
+  useEffect(() => {
+    const route = routeRef.current;
+    const marker = markerRef.current;
+    if (!route || !marker) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (route.closest(".mk--flat")) return;
+    const legs = Array.from(route.querySelectorAll(".mk-pk-leg"));
+    if (!legs.length) return;
+
+    let paths = [];
+    let lens = [];
+    const measure = () => {
+      const desk = window.matchMedia("(min-width: 760px)").matches;
+      paths = legs.map((l) => l.querySelector(desk ? ".mk-pk-leg-track.is-desk" : ".mk-pk-leg-track.is-mob"));
+      lens = paths.map((p) => p.getTotalLength());
+    };
+
+    const pos = { x: 0, y: 0, cx: 0, cy: 0 };
+    const calc = () => {
+      const anchor = window.innerHeight * 0.42;
+      let li = 0;
+      let p = 0;
+      for (let i = 0; i < legs.length; i++) {
+        const r = legs[i].getBoundingClientRect();
+        if (anchor >= r.top) { li = i; p = Math.min(1, (anchor - r.top) / r.height); }
+      }
+      const r = legs[li].getBoundingClientRect();
+      const rr = route.getBoundingClientRect();
+      const pt = paths[li].getPointAtLength(p * lens[li]);
+      pos.x = r.left - rr.left + (pt.x / 100) * r.width;
+      pos.y = r.top - rr.top + (pt.y / 100) * r.height;
+    };
+    measure();
+    calc();
+    pos.cx = pos.x;
+    pos.cy = pos.y;
+
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      pos.cx += (pos.x - pos.cx) * 0.12;
+      pos.cy += (pos.y - pos.cy) * 0.12;
+      marker.style.transform = `translate3d(${pos.cx}px, ${pos.cy}px, 0) translate(-50%, -50%)`;
+    };
+    raf = requestAnimationFrame(tick);
+
+    const onScroll = () => calc();
+    const onResize = () => { measure(); calc(); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    marker.style.opacity = "1";
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [pkg]);
+
   const dates = useMemo(() => upcomingDepartures(pkg?.departureDates), [pkg]);
   const cats = pkg?.hotelCategories || [];
   const place = useMemo(
@@ -107,7 +189,7 @@ export default function PackagePage() {
     if (place) list.push({ id: "ch-map", label: t("pk_map") });
     if (images.length > 1) list.push({ id: "ch-gallery", label: t("pk_gallery") });
     return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [pkg, cats.length, dates.length, images.length, place, t]);
 
   /* scrollspy for the chapter rail */
@@ -270,41 +352,55 @@ export default function PackagePage() {
                 </Reveal>
               ))}
 
-              {/* Itinerary — spine timeline */}
+              {/* Itinerary — "la route": dotted travel route with day stations */}
               {(pkg.days || []).length > 0 && (
                 <section className="mk-pk-chap" id="ch-days" data-chapter="">
                   <ChapHead n={++chapN} title={pkg.itineraryTitle || t("pk_days")} />
-                  <ol className="mk-pk-spine">
-                    {pkg.days.map((d, i) => (
-                      <Reveal as="li" key={d.id ?? i} delay={(i % 3) * 70}>
-                        <div className="mk-pk-spine-mark" aria-hidden="true">
-                          <i>{d.num || String(i + 1).padStart(2, "0")}</i>
-                        </div>
-                        <div className="mk-pk-spine-body">
-                          {d.theme && <em className="mk-pk-spine-kicker">{d.theme}</em>}
-                          <h3>
-                            {d.title}
-                            {d.badge && <span className="mk-sr-chip">{d.badge}</span>}
-                          </h3>
-                          {(d.activities || []).length > 0 && (
-                            <ul className="mk-pk-spine-acts">
-                              {d.activities.map((a, j) => (
-                                <li key={a.id ?? j}>
-                                  {a.label}
-                                  {a.optional && <em> — {t("pk_optional")}</em>}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {d.image && (
-                            <figure className="mk-pk-spine-fig">
-                              <img src={d.image} alt="" loading="lazy" />
-                            </figure>
-                          )}
-                        </div>
-                      </Reveal>
-                    ))}
-                  </ol>
+                  <div className="mk-pk-route" ref={routeRef}>
+                    <div className="mk-pk-route-cap" aria-hidden="true">
+                      <i /><span>{t("pk_route_start")}</span>
+                    </div>
+                    <ol className="mk-pk-route-legs">
+                      {pkg.days.map((d, i) => {
+                        const num = d.num || String(i + 1).padStart(2, "0");
+                        return (
+                          <li key={d.id ?? i} className={`mk-pk-leg ${i % 2 ? "is-flip" : ""}`}>
+                            <LegPath flip={i % 2 === 1} rtl={isRTL} />
+                            <div className="mk-pk-leg-station" aria-hidden="true"><i>{num}</i></div>
+                            <Reveal className="mk-pk-leg-grid" delay={60}>
+                              <div className="mk-pk-leg-body">
+                                <span className="mk-pk-leg-ghost" aria-hidden="true">{num}</span>
+                                {d.theme && <em className="mk-pk-leg-kicker">{d.theme}</em>}
+                                <h3>
+                                  {d.title}
+                                  {d.badge && <span className="mk-sr-chip">{d.badge}</span>}
+                                </h3>
+                                {(d.activities || []).length > 0 && (
+                                  <ul className="mk-pk-leg-acts">
+                                    {d.activities.map((a, j) => (
+                                      <li key={a.id ?? j}>
+                                        {a.label}
+                                        {a.optional && <em> — {t("pk_optional")}</em>}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                              {d.image && (
+                                <figure className="mk-pk-leg-fig">
+                                  <img src={d.image} alt="" loading="lazy" />
+                                </figure>
+                              )}
+                            </Reveal>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                    <div className="mk-pk-route-cap is-end" aria-hidden="true">
+                      <i /><span>{t("pk_route_end")}</span>
+                    </div>
+                    <div className="mk-pk-route-marker" ref={markerRef} aria-hidden="true"><i /></div>
+                  </div>
                 </section>
               )}
 

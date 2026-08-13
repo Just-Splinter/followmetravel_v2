@@ -1,0 +1,1605 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   OMRA — "Le voyage vers la lumière"
+   A night-to-dawn scroll journey: deep indigo night over Makkah, antique gold
+   illumination, Amiri calligraphy, pointed-arch frames — then the page itself
+   dawns into the site's warm paper for Madinah and the practical chapters.
+   Scoped under .om (rendered inside the .mk shell). Every padded button is
+   written `.mk .om-…` — the .mk element reset outranks single classes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.om {
+  --om-night: #0a0d18;
+  --om-night-2: #0e1322;
+  --om-night-3: #131a30;
+  --om-gold: #c9a961;
+  --om-gold-deep: #a4813d;
+  --om-gold-line: rgba(201, 169, 97, 0.4);
+  --om-gold-faint: rgba(201, 169, 97, 0.18);
+  --om-cream: #ece4d2;
+  --om-cream-2: rgba(236, 228, 210, 0.6);
+  --om-arabic: "Amiri", "IBM Plex Sans Arabic", serif;
+  background: var(--om-night);
+}
+
+.om ::selection {
+  background: rgba(201, 169, 97, 0.35);
+}
+
+/* the sticky header stays part of the night on this page */
+.om .mk-header.is-solid {
+  background: rgba(10, 13, 24, 0.88);
+  border-bottom-color: rgba(201, 169, 97, 0.18);
+  color: #fff;
+}
+.om .mk-header.is-solid .mk-logo b {
+  color: var(--om-gold);
+}
+.om .mk-header.is-solid .mk-nav a.mk-nav-gold {
+  color: var(--om-gold);
+}
+
+.om-wrap {
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 4vw, 48px);
+}
+
+/* small-caps latin eyebrow, gold */
+.om-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--om-gold);
+}
+[dir="rtl"] .om-kicker {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 13px;
+}
+
+/* ornamental divider — hairline · 8-point star · hairline */
+.om-div {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+  color: var(--om-gold);
+}
+.om-div::before,
+.om-div::after {
+  content: "";
+  height: 1px;
+  width: min(120px, 20vw);
+  background: linear-gradient(to var(--om-div-dir, right), transparent, var(--om-gold-line));
+}
+.om-div::after {
+  background: linear-gradient(to var(--om-div-dir-r, left), transparent, var(--om-gold-line));
+}
+.om-div svg {
+  flex: 0 0 auto;
+}
+
+/* ── Hero — la nuit du départ ─────────────────────────────────────────────── */
+.om-hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  color: var(--om-cream);
+}
+.om-hero-bg {
+  position: absolute;
+  inset: 0;
+}
+.om-hero-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: omHeroSettle 26s var(--ease, ease) both;
+}
+@keyframes omHeroSettle {
+  from { transform: scale(1.09); }
+  to { transform: scale(1); }
+}
+.om-hero-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(8, 10, 20, 0.34), rgba(8, 10, 20, 0.34)),
+    radial-gradient(ellipse 120% 90% at 50% 110%, rgba(8, 10, 20, 0.2) 0%, rgba(8, 10, 20, 0.78) 78%),
+    linear-gradient(to bottom, rgba(8, 10, 20, 0.62) 0%, rgba(8, 10, 20, 0.12) 30%, rgba(8, 10, 20, 0.1) 55%, rgba(10, 13, 24, 0.92) 100%);
+}
+.om-stars {
+  position: absolute;
+  inset: 0 0 40% 0;
+  pointer-events: none;
+}
+.om-stars i {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--om-cream);
+  opacity: 0.12;
+  animation: omTwinkle 7s ease-in-out infinite;
+}
+@keyframes omTwinkle {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.75; }
+}
+.om-hero-in {
+  position: relative;
+  z-index: 2;
+  padding: 120px 20px 90px;
+  max-width: 1000px;
+}
+.om-talbiyah {
+  font-family: var(--om-arabic);
+  font-weight: 400;
+  font-size: clamp(42px, 8.4vw, 104px);
+  line-height: 1.55;
+  color: var(--om-gold);
+  margin: 26px 0 8px;
+  direction: rtl;
+}
+.om-hero-title {
+  font-family: var(--serif, serif);
+  font-weight: 300;
+  font-size: clamp(22px, 3.2vw, 36px);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  text-indent: 0.34em;
+  color: var(--om-cream);
+  margin: 18px 0 0;
+}
+[dir="rtl"] .om .om-hero-title {
+  font-family: var(--om-arabic);
+  letter-spacing: 0;
+  text-indent: 0;
+  text-transform: none;
+  font-size: clamp(26px, 3.6vw, 42px);
+  font-weight: 700;
+}
+.om-hero-sub {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  letter-spacing: 0.12em;
+  color: var(--om-cream-2);
+}
+[dir="rtl"] .om .om-hero-sub {
+  letter-spacing: 0;
+  font-size: 15px;
+}
+.om-hero-cue {
+  position: absolute;
+  z-index: 2;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--om-cream-2);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+[dir="rtl"] .om .om-hero-cue {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12.5px;
+}
+.om-hero-cue i {
+  width: 1px;
+  height: 56px;
+  background: rgba(236, 228, 210, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+.om-hero-cue i::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -40%;
+  width: 100%;
+  height: 40%;
+  background: var(--om-gold);
+  animation: omCue 2.6s var(--ease, ease) infinite;
+}
+@keyframes omCue {
+  to { top: 110%; }
+}
+
+/* ── Manuscript column — l'intention ──────────────────────────────────────── */
+.om-niyya {
+  position: relative;
+  background: linear-gradient(var(--om-night), var(--om-night-2));
+  padding: clamp(90px, 12vw, 150px) 0;
+  text-align: center;
+  color: var(--om-cream);
+  overflow: hidden;
+}
+.om-niyya-medallion {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, 120vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.05;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
+.om-niyya-in {
+  position: relative;
+  max-width: 660px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+.om-word {
+  display: block;
+  font-family: var(--om-arabic);
+  font-size: clamp(38px, 6vw, 58px);
+  color: var(--om-gold);
+  line-height: 1.7;
+  margin: 30px 0 4px;
+  direction: rtl;
+}
+.om-niyya h2,
+.om-chap-latin {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: clamp(24px, 3.4vw, 34px);
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+}
+.om-niyya p {
+  font-size: 16px;
+  line-height: 1.95;
+  color: var(--om-cream-2);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* ── Chapters (Makkah on night, Madinah on paper) ─────────────────────────── */
+.om-chap {
+  padding: clamp(80px, 11vw, 140px) 0 clamp(60px, 8vw, 100px);
+}
+.om-chap--night {
+  background: linear-gradient(var(--om-night-2), var(--om-night-3));
+  color: var(--om-cream);
+}
+.om-chap--dawn {
+  background: var(--paper, #f6f2ea);
+  color: var(--ink, #1b1713);
+}
+.om-chap-head {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto clamp(48px, 7vw, 84px);
+  padding-inline: 24px;
+}
+.om-chap-ar {
+  display: block;
+  font-family: var(--om-arabic);
+  font-size: clamp(44px, 7.6vw, 84px);
+  line-height: 1.6;
+  color: var(--om-gold);
+  margin: 20px 0 2px;
+  direction: rtl;
+}
+.om-chap--dawn .om-chap-ar {
+  color: var(--om-gold-deep);
+}
+.om-chap-latin {
+  margin-bottom: 16px;
+}
+.om-chap-head p {
+  font-size: 15.5px;
+  line-height: 1.9;
+  color: var(--om-cream-2);
+  margin: 0;
+  text-wrap: pretty;
+}
+.om-chap--dawn .om-chap-head p {
+  color: var(--ink-2, #6b6259);
+}
+
+/* arch-framed triptych */
+.om-arches {
+  display: grid;
+  gap: clamp(22px, 4vw, 44px);
+  grid-template-columns: 1fr;
+  max-width: 500px;
+  margin-inline: auto;
+}
+@media (min-width: 800px) {
+  .om-arches {
+    grid-template-columns: 1fr 1fr 1fr;
+    max-width: none;
+    align-items: end;
+  }
+  .om-arches > :nth-child(2) {
+    margin-bottom: clamp(24px, 4vw, 56px); /* central arch floats higher */
+  }
+}
+.om-arch {
+  margin: 0;
+  position: relative;
+}
+.om-arch-img {
+  position: relative;
+  aspect-ratio: 100 / 132;
+  clip-path: url(#om-arch-clip);
+  overflow: hidden;
+  background: var(--om-night-3);
+}
+.om-arch-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 1400ms var(--ease, ease);
+}
+.om-arch:hover .om-arch-img img {
+  transform: scale(1.045);
+}
+.om-arch-img::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(8, 10, 20, 0.08), rgba(8, 10, 20, 0) 30%, rgba(8, 10, 20, 0.22) 100%);
+  pointer-events: none;
+}
+.om-arch-frame {
+  position: absolute;
+  inset: -9px;
+  width: calc(100% + 18px);
+  height: calc(100% + 18px);
+  color: var(--om-gold-line);
+  pointer-events: none;
+}
+.om-chap--dawn .om-arch-frame {
+  color: rgba(164, 129, 61, 0.5);
+}
+.om-arch figcaption {
+  margin-top: 30px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.om-arch figcaption span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--om-cream-2);
+}
+.om-chap--dawn .om-arch figcaption span {
+  color: var(--ink-2, #6b6259);
+}
+[dir="rtl"] .om .om-arch figcaption span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12.5px;
+}
+.om-arch figcaption em {
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: 21px;
+  color: var(--om-gold);
+  direction: rtl;
+}
+.om-chap--dawn .om-arch figcaption em {
+  color: var(--om-gold-deep);
+}
+
+/* full-bleed image band with centred line */
+.om-band {
+  position: relative;
+  height: clamp(340px, 52vw, 560px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.om-band img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@supports (animation-timeline: view()) {
+  .om-band img {
+    height: 130%;
+    top: -15%;
+    animation: omBandPar linear both;
+    animation-timeline: view();
+  }
+  @keyframes omBandPar {
+    from { transform: translateY(-4%); }
+    to { transform: translateY(4%); }
+  }
+}
+.om-band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(8, 10, 20, 0.44), rgba(8, 10, 20, 0.44)),
+    linear-gradient(to bottom, var(--om-night-3) 0%, transparent 24%, transparent 76%, var(--om-night-3) 100%);
+}
+.om-band-quote {
+  position: relative;
+  z-index: 1;
+  padding-inline: 24px;
+}
+.om-band-quote em {
+  display: block;
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: clamp(30px, 5vw, 52px);
+  color: var(--om-gold);
+  line-height: 1.7;
+  direction: rtl;
+}
+.om-band-quote span {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--om-cream-2);
+}
+[dir="rtl"] .om .om-band-quote span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 15px;
+}
+
+/* ── The dawn — night dissolves into paper ────────────────────────────────── */
+.om-dawn {
+  position: relative;
+  height: clamp(430px, 64vw, 700px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.om-dawn img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.om-dawn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--om-night-3) 0%, rgba(19, 26, 48, 0.5) 18%, transparent 42%),
+    linear-gradient(to top, var(--paper, #f6f2ea) 0%, rgba(246, 242, 234, 0.5) 12%, transparent 34%);
+}
+.om-dawn-quote {
+  position: relative;
+  z-index: 1;
+  padding-inline: 24px;
+}
+.om-dawn-quote em {
+  display: block;
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: clamp(32px, 5.4vw, 56px);
+  color: #fff;
+  text-shadow: 0 2px 26px rgba(8, 10, 20, 0.55);
+  line-height: 1.7;
+  direction: rtl;
+}
+.om-dawn-quote span {
+  display: block;
+  margin-top: 6px;
+  font-size: 13.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 14px rgba(8, 10, 20, 0.5);
+}
+[dir="rtl"] .om .om-dawn-quote span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 15.5px;
+}
+
+/* ── Forfaits — manuscript tickets on paper ───────────────────────────────── */
+.om-packs {
+  background: var(--paper, #f6f2ea);
+  color: var(--ink, #1b1713);
+  padding: clamp(70px, 9vw, 120px) 0 clamp(80px, 10vw, 130px);
+}
+.om-packs-head {
+  text-align: center;
+  margin-bottom: clamp(40px, 6vw, 70px);
+}
+.om-packs-head .om-kicker {
+  color: var(--om-gold-deep);
+}
+.om-packs-list {
+  display: grid;
+  gap: clamp(28px, 4vw, 44px);
+}
+.om-pack {
+  position: relative;
+  background: #fffdf9;
+  border: 1px solid rgba(164, 129, 61, 0.4);
+  outline: 1px solid rgba(164, 129, 61, 0.18);
+  outline-offset: 5px;
+  border-radius: 6px;
+  padding: clamp(26px, 4vw, 44px);
+  display: grid;
+  gap: clamp(26px, 4vw, 46px);
+}
+@media (min-width: 900px) {
+  .om-pack {
+    grid-template-columns: 1.35fr 1fr;
+    align-items: start;
+  }
+}
+.om-pack-year {
+  position: absolute;
+  top: 0;
+  inset-inline-start: clamp(26px, 4vw, 44px);
+  transform: translateY(-50%);
+  background: var(--om-night-2);
+  color: var(--om-gold);
+  font-family: var(--serif, serif);
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  padding: 7px 18px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--om-gold-line);
+}
+.om-pack h3 {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: clamp(26px, 3.4vw, 34px);
+  letter-spacing: -0.01em;
+  margin: 6px 0 2px;
+}
+[dir="rtl"] .om .om-pack h3 {
+  font-weight: 600;
+}
+.om-pack-ar {
+  display: block;
+  font-family: var(--om-arabic);
+  font-size: 24px;
+  color: var(--om-gold-deep);
+  margin-bottom: 16px;
+  direction: rtl;
+}
+[dir="ltr"] .om .om-pack-ar {
+  text-align: left;
+}
+.om-pack-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: rgba(164, 129, 61, 0.22);
+  border-block: 1px solid rgba(164, 129, 61, 0.22);
+  margin: 18px 0 20px;
+}
+.om-pack-meta > div {
+  background: #fffdf9;
+  padding: 12px 14px;
+}
+.om-pack-meta dt {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2, #6b6259);
+  margin: 0 0 4px;
+}
+[dir="rtl"] .om .om-pack-meta dt {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+}
+.om-pack-meta dd {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.om-pack-meta dd b {
+  font-weight: 600;
+}
+.om-stars-inline {
+  color: var(--om-gold-deep);
+  letter-spacing: 2px;
+}
+.om-pack-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.om-pack-date {
+  border: 1px solid rgba(164, 129, 61, 0.4);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+}
+.om-pack-date b {
+  font-family: var(--serif, serif);
+  font-weight: 500;
+  font-size: 15px;
+  display: block;
+}
+.om-pack-date span {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--om-gold-deep);
+  margin-top: 2px;
+}
+[dir="rtl"] .om .om-pack-date span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+}
+.om-pack-inc {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.om-pack-inc li {
+  font-size: 13px;
+  color: var(--ink-2, #6b6259);
+  position: relative;
+  padding-inline-start: 16px;
+}
+.om-pack-inc li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  background: var(--om-gold-deep);
+  rotate: 45deg;
+}
+
+/* the jewel — night pricing panel */
+.om-pack-price {
+  background: linear-gradient(160deg, var(--om-night-2), var(--om-night));
+  color: var(--om-cream);
+  border-radius: 6px;
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid rgba(201, 169, 97, 0.3);
+}
+.om-pack-price-cap {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--om-gold);
+  margin-bottom: 14px;
+}
+[dir="rtl"] .om .om-pack-price-cap {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12.5px;
+}
+.om-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.16);
+}
+.om-price-row:last-of-type {
+  border-bottom: 0;
+}
+.om-price-row .l {
+  font-size: 13.5px;
+  color: var(--om-cream-2);
+}
+.om-price-row .l em {
+  font-style: normal;
+  font-family: var(--om-arabic);
+  color: var(--om-cream-2);
+  margin-inline-start: 8px;
+  font-size: 14px;
+}
+.om-price-row b {
+  font-family: var(--serif, serif);
+  font-weight: 500;
+  font-size: 19px;
+  color: var(--om-gold);
+  white-space: nowrap;
+}
+.om-price-row b i {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--om-cream-2);
+  margin-inline-start: 4px;
+}
+.om-price-note {
+  font-size: 11.5px;
+  color: var(--om-cream-2);
+  margin: 10px 0 16px;
+}
+.mk .om-book-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: var(--om-gold);
+  color: #14100a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 15px 20px;
+  cursor: pointer;
+  transition: background 300ms ease, transform 300ms var(--ease, ease);
+}
+.mk .om-book-btn:hover {
+  background: #d8ba74;
+  transform: translateY(-1px);
+}
+.om-packs-empty {
+  text-align: center;
+  border: 1px solid rgba(164, 129, 61, 0.35);
+  outline: 1px solid rgba(164, 129, 61, 0.15);
+  outline-offset: 5px;
+  border-radius: 6px;
+  background: #fffdf9;
+  padding: clamp(44px, 7vw, 80px) 24px;
+  max-width: 720px;
+  margin-inline: auto;
+}
+.om-packs-empty .om-word {
+  color: var(--om-gold-deep);
+  margin-top: 0;
+}
+.om-packs-empty p {
+  color: var(--ink-2, #6b6259);
+  max-width: 46ch;
+  margin: 10px auto 0;
+  line-height: 1.8;
+}
+
+/* ── Inclusions ───────────────────────────────────────────────────────────── */
+.om-inc {
+  background: var(--paper-2, #efe9dd);
+  padding: clamp(64px, 9vw, 110px) 0;
+  color: var(--ink, #1b1713);
+}
+.om-inc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: rgba(164, 129, 61, 0.24);
+  border: 1px solid rgba(164, 129, 61, 0.24);
+  margin-top: clamp(36px, 5vw, 56px);
+}
+.om-inc-cell {
+  background: var(--paper-2, #efe9dd);
+  padding: clamp(22px, 3vw, 34px) 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+}
+.om-inc-cell svg {
+  color: var(--om-gold-deep);
+}
+.om-inc-cell span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2, #6b6259);
+  line-height: 1.5;
+}
+[dir="rtl"] .om .om-inc-cell span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 13.5px;
+}
+
+/* ── CTA — le retour ──────────────────────────────────────────────────────── */
+.om-cta {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  color: #fff;
+  padding: clamp(90px, 13vw, 170px) 24px;
+}
+.om-cta > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.om-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(10, 13, 24, 0.66), rgba(10, 13, 24, 0.66)),
+    linear-gradient(to bottom, var(--paper-2, #efe9dd) 0%, transparent 14%);
+}
+.om-cta-in {
+  position: relative;
+  z-index: 1;
+}
+.om-cta .om-word {
+  color: var(--om-gold);
+}
+.om-cta h2 {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: clamp(26px, 4vw, 40px);
+  margin: 0 0 12px;
+}
+.om-cta p {
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 52ch;
+  margin: 0 auto 30px;
+  line-height: 1.8;
+}
+.om-cta-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.mk .om-cta-ghost {
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: transparent;
+  color: #fff;
+  border-radius: 999px;
+  padding: 14px 26px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 300ms ease, background 300ms ease;
+}
+.mk .om-cta-ghost:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.mk .om-cta-gold {
+  border: 0;
+  background: var(--om-gold);
+  color: #14100a;
+  border-radius: 999px;
+  padding: 14px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 300ms ease;
+}
+.mk .om-cta-gold:hover {
+  background: #d8ba74;
+}
+
+/* ── Reservation modal — the tent at night ────────────────────────────────── */
+.om-bk-ov {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(6, 8, 16, 0.82);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+@media (min-width: 760px) {
+  .om-bk-ov {
+    align-items: center;
+    padding: 30px;
+  }
+}
+.om-bk {
+  background: #fffdf9;
+  color: var(--ink, #1b1713);
+  width: 100%;
+  max-width: 1060px;
+  max-height: 94svh;
+  border-radius: 14px 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(201, 169, 97, 0.5);
+}
+@media (min-width: 760px) {
+  .om-bk {
+    border-radius: 10px;
+    max-height: 88svh;
+  }
+}
+.om-bk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px clamp(20px, 3vw, 30px);
+  border-bottom: 1px solid rgba(164, 129, 61, 0.3);
+}
+.om-bk-head h3 {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: 21px;
+  margin: 0;
+}
+.om-bk-head h3 em {
+  display: block;
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: 15px;
+  color: var(--om-gold-deep);
+  margin-top: 2px;
+  direction: rtl;
+}
+[dir="ltr"] .om-bk-head h3 em {
+  text-align: left;
+}
+.mk .om-bk-x {
+  border: 1px solid rgba(164, 129, 61, 0.4);
+  background: transparent;
+  color: var(--ink, #1b1713);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 15px;
+  flex: 0 0 auto;
+  transition: background 250ms ease;
+}
+.mk .om-bk-x:hover {
+  background: rgba(164, 129, 61, 0.12);
+}
+.om-bk-body {
+  overflow: auto;
+  display: grid;
+  gap: 0;
+}
+@media (min-width: 900px) {
+  .om-bk-body {
+    grid-template-columns: 1.55fr 1fr;
+    overflow: hidden;
+  }
+}
+.om-bk-main {
+  padding: clamp(20px, 3vw, 30px);
+  overflow: auto;
+}
+.om-bk-cap {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--om-gold-deep);
+  margin: 24px 0 12px;
+}
+.om-bk-cap:first-child {
+  margin-top: 0;
+}
+[dir="rtl"] .om-bk-cap {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12.5px;
+}
+.om-bk-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mk .om-bk-date {
+  border: 1px solid rgba(164, 129, 61, 0.4);
+  background: #fffdf9;
+  color: var(--ink, #1b1713);
+  border-radius: 8px;
+  padding: 11px 16px;
+  text-align: start;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 250ms ease, background 250ms ease;
+}
+.mk .om-bk-date b {
+  font-family: var(--serif, serif);
+  font-weight: 500;
+  font-size: 15.5px;
+  display: block;
+}
+.mk .om-bk-date span {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--om-gold-deep);
+}
+[dir="rtl"] .mk .om-bk-date span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+}
+.mk .om-bk-date.is-on {
+  border-color: var(--om-gold-deep);
+  background: rgba(201, 169, 97, 0.14);
+  box-shadow: inset 0 0 0 1px var(--om-gold-deep);
+}
+.om-bk-occ {
+  display: flex;
+  flex-direction: column;
+}
+.om-bk-occ-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(164, 129, 61, 0.2);
+}
+.om-bk-occ-row .info b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.om-bk-occ-row .info em {
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: 13.5px;
+  color: var(--om-gold-deep);
+}
+.om-bk-occ-row .info span {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink-2, #6b6259);
+  margin-top: 1px;
+}
+.om-bk-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mk .om-bk-step button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(164, 129, 61, 0.5);
+  background: transparent;
+  color: var(--ink, #1b1713);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 250ms ease;
+}
+.mk .om-bk-step button:hover {
+  background: rgba(201, 169, 97, 0.16);
+}
+.mk .om-bk-step button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.om-bk-step b {
+  min-width: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 15.5px;
+}
+.om-bk-grid {
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .om-bk-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.mk .om-bk-input,
+.om-bk textarea.om-bk-input {
+  width: 100%;
+  border: 1px solid rgba(164, 129, 61, 0.4);
+  background: #fffdf9;
+  color: var(--ink, #1b1713);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+}
+.mk .om-bk-input:focus-visible {
+  outline: 2px solid var(--om-gold-deep);
+  outline-offset: 1px;
+}
+.om-bk-pilgrim {
+  border: 1px solid rgba(164, 129, 61, 0.28);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.om-bk-pilgrim > span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--om-gold-deep);
+  margin-bottom: 9px;
+}
+[dir="rtl"] .om-bk-pilgrim > span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12.5px;
+}
+/* recap — the night panel */
+.om-bk-recap {
+  background: linear-gradient(170deg, var(--om-night-2), var(--om-night));
+  color: var(--om-cream);
+  padding: clamp(22px, 3vw, 30px);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.om-bk-recap .om-bk-cap {
+  color: var(--om-gold);
+}
+.om-bk-recap-rows {
+  flex: 1;
+}
+.om-bk-recap-rows > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.16);
+  font-size: 13.5px;
+}
+.om-bk-recap-rows span {
+  color: var(--om-cream-2);
+}
+.om-bk-recap-rows b {
+  font-weight: 500;
+  text-align: end;
+}
+.om-bk-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 16px;
+  margin-top: 6px;
+}
+.om-bk-total span {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--om-cream-2);
+}
+[dir="rtl"] .om-bk-total span {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 13.5px;
+}
+.om-bk-total b {
+  font-family: var(--serif, serif);
+  font-weight: 500;
+  font-size: 30px;
+  color: var(--om-gold);
+}
+.om-bk-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.mk .om-bk-next {
+  flex: 1;
+  border: 0;
+  border-radius: 999px;
+  background: var(--om-gold);
+  color: #14100a;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: background 300ms ease;
+}
+.mk .om-bk-next:hover {
+  background: #d8ba74;
+}
+.mk .om-bk-next:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mk .om-bk-ghost {
+  border: 1px solid rgba(236, 228, 210, 0.4);
+  background: transparent;
+  color: var(--om-cream);
+  border-radius: 999px;
+  padding: 14px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.om-bk-err {
+  color: #e2574b;
+  font-size: 13px;
+  margin-top: 10px;
+}
+.om-bk-hint {
+  font-size: 11.5px;
+  color: var(--om-cream-2);
+  margin-top: 12px;
+  line-height: 1.6;
+}
+/* auth gate + success */
+.om-bk-center {
+  padding: clamp(40px, 6vw, 70px) 24px;
+  text-align: center;
+  max-width: 480px;
+  margin-inline: auto;
+}
+.om-bk-center .om-word {
+  color: var(--om-gold-deep);
+}
+.om-bk-center h3 {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: 24px;
+  margin: 6px 0 10px;
+}
+.om-bk-center p {
+  color: var(--ink-2, #6b6259);
+  line-height: 1.8;
+  margin: 0 0 22px;
+}
+.om-bk-ref {
+  display: inline-block;
+  border: 1px dashed rgba(164, 129, 61, 0.6);
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-family: var(--serif, serif);
+  font-size: 17px;
+  color: var(--om-gold-deep);
+  margin-bottom: 20px;
+}
+
+/* landing teaser */
+.om-teaser {
+  position: relative;
+  overflow: hidden;
+  color: var(--om-cream);
+  background: var(--om-night);
+}
+.om-teaser img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.5;
+}
+.om-teaser::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(10, 13, 24, 0.6), rgba(10, 13, 24, 0.86));
+}
+.om-teaser-in {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: clamp(70px, 10vw, 120px) 24px;
+}
+.om-teaser-in .om-word {
+  margin-top: 22px;
+}
+.om-teaser-in h2 {
+  font-family: var(--serif, serif);
+  font-weight: 300;
+  font-size: clamp(20px, 2.6vw, 28px);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-indent: 0.3em;
+  margin: 0 0 10px;
+}
+[dir="rtl"] .mk .om-teaser-in h2 {
+  font-family: var(--om-arabic);
+  letter-spacing: 0;
+  text-indent: 0;
+  text-transform: none;
+  font-weight: 700;
+}
+.om-teaser-in p {
+  color: var(--om-cream-2);
+  max-width: 52ch;
+  margin: 0 auto 26px;
+  line-height: 1.8;
+}
+.mk .om-teaser-btn {
+  border: 1px solid var(--om-gold-line);
+  background: transparent;
+  color: var(--om-gold);
+  border-radius: 999px;
+  padding: 13px 28px;
+  font-size: 13.5px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 300ms ease, color 300ms ease;
+}
+.mk .om-teaser-btn:hover {
+  background: var(--om-gold);
+  color: #14100a;
+}
+
+/* motion hygiene */
+.mk--flat .om-hero-bg img,
+.mk--flat .om-stars i,
+.mk--flat .om-hero-cue i::after,
+.mk--flat .om-band img {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .om-hero-bg img,
+  .om-stars i,
+  .om-hero-cue i::after,
+  .om-band img {
+    animation: none;
+  }
+}
+
+/* ═══ 1000x pass — choreography, drawn ornaments, illuminated details ═══ */
+
+/* shared keyframes (from-only: base styles are the final state, so
+   .mk--flat / reduced-motion can simply kill the animation) */
+@keyframes omFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+}
+@keyframes omRise {
+  from { transform: translateY(108%); }
+}
+@keyframes omTrackIn {
+  from { opacity: 0; letter-spacing: 0.52em; }
+}
+@keyframes omSpin {
+  to { rotate: 360deg; }
+}
+@keyframes omSpinC {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes omDrawView {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes omThreadDraw {
+  to { transform: scaleY(1); }
+}
+
+/* girih lattice — a whisper of geometry on every night surface */
+.om-niyya,
+.om-chap--night,
+.om-teaser::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23ece4d2' stroke-opacity='0.02' stroke-width='0.6'%3E%3Crect x='34' y='34' width='28' height='28'/%3E%3Crect x='34' y='34' width='28' height='28' transform='rotate(45 48 48)'/%3E%3Crect x='-14' y='-14' width='28' height='28'/%3E%3Crect x='-14' y='-14' width='28' height='28' transform='rotate(45 0 0)'/%3E%3Crect x='82' y='-14' width='28' height='28'/%3E%3Crect x='82' y='-14' width='28' height='28' transform='rotate(45 96 0)'/%3E%3Crect x='-14' y='82' width='28' height='28'/%3E%3Crect x='-14' y='82' width='28' height='28' transform='rotate(45 0 96)'/%3E%3Crect x='82' y='82' width='28' height='28'/%3E%3Crect x='82' y='82' width='28' height='28' transform='rotate(45 96 96)'/%3E%3Cpath d='M20 48 L48 20 L76 48 L48 76 Z'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(var(--om-night), var(--om-night-2));
+}
+.om-chap--night {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23ece4d2' stroke-opacity='0.02' stroke-width='0.6'%3E%3Crect x='34' y='34' width='28' height='28'/%3E%3Crect x='34' y='34' width='28' height='28' transform='rotate(45 48 48)'/%3E%3Crect x='-14' y='-14' width='28' height='28'/%3E%3Crect x='-14' y='-14' width='28' height='28' transform='rotate(45 0 0)'/%3E%3Crect x='82' y='-14' width='28' height='28'/%3E%3Crect x='82' y='-14' width='28' height='28' transform='rotate(45 96 0)'/%3E%3Crect x='-14' y='82' width='28' height='28'/%3E%3Crect x='-14' y='82' width='28' height='28' transform='rotate(45 0 96)'/%3E%3Crect x='82' y='82' width='28' height='28'/%3E%3Crect x='82' y='82' width='28' height='28' transform='rotate(45 96 96)'/%3E%3Cpath d='M20 48 L48 20 L76 48 L48 76 Z'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(var(--om-night-2), var(--om-night-3));
+}
+
+/* hero choreography */
+.om-mask {
+  display: block;
+  overflow: hidden;
+}
+.om-hero .om-kicker {
+  animation: omFadeUp 800ms var(--ease, ease) 150ms both;
+}
+.om-hero .om-talbiyah {
+  animation: omRise 1200ms var(--ease, ease) 350ms both;
+}
+.om-hero .om-div {
+  animation: omFadeUp 800ms var(--ease, ease) 900ms both;
+}
+.om-hero-title {
+  animation: omTrackIn 1300ms var(--ease, ease) 1000ms both;
+}
+[dir="rtl"] .om .om-hero-title {
+  animation-name: omFadeUp;
+}
+.om-hero-sub {
+  animation: omFadeUp 800ms var(--ease, ease) 1350ms both;
+}
+.om-hero-cue {
+  animation: omFadeUp 900ms var(--ease, ease) 1750ms both;
+}
+/* vast, slowly turning geometry behind the calligraphy */
+.om-hero-orn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(72vw, 680px);
+  aspect-ratio: 1;
+  color: var(--om-cream);
+  opacity: 0.055;
+  animation: omSpinC 280s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+.om-stars .l {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+/* the golden thread — each station of the journey hangs from it */
+.om-thread {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 104px;
+  margin: 0 auto 26px;
+  color: var(--om-gold);
+  width: fit-content;
+}
+.om-chap--dawn .om-thread,
+.om-packs .om-thread {
+  color: var(--om-gold-deep);
+}
+.om-thread i {
+  width: 1px;
+  flex: 1;
+  background: linear-gradient(to bottom, transparent, currentColor);
+  opacity: 0.6;
+  transform: scaleY(0);
+  transform-origin: top;
+  animation: omThreadDraw 1ms linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 90%;
+}
+.om-thread svg {
+  flex: 0 0 auto;
+}
+
+/* niyya medallion — imperceptibly turning */
+.om-niyya-medallion {
+  animation: omSpinC 320s linear infinite;
+}
+
+/* arch frames draw themselves in as you scroll */
+.om-arch-frame path {
+  stroke-dasharray: 380;
+  stroke-dashoffset: 380;
+  animation: omDrawView 1ms linear both;
+  animation-timeline: view();
+  animation-range: entry 5% cover 52%;
+}
+@supports (animation-timeline: view()) {
+  .om-arch-img img {
+    animation: omArchSettle 1ms linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 60%;
+  }
+  @keyframes omArchSettle {
+    from { transform: scale(1.14); }
+    to { transform: scale(1); }
+  }
+}
+.om-arch figcaption span,
+.om-arch figcaption em {
+  animation: omFadeUp 900ms var(--ease, ease) both;
+  animation-timeline: view();
+  animation-range: entry 20% cover 55%;
+}
+
+/* illuminated manuscript corners + lift on the package tickets */
+.om-pack {
+  transition: transform 600ms var(--ease, ease), box-shadow 600ms var(--ease, ease);
+}
+.om-pack:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 30px 60px rgba(27, 23, 19, 0.09);
+}
+.om-pack::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 0 0 / 22px 1px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 0 0 / 1px 22px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 100% 0 / 22px 1px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 100% 0 / 1px 22px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 0 100% / 22px 1px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 0 100% / 1px 22px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 100% 100% / 22px 1px,
+    linear-gradient(var(--om-gold-deep), var(--om-gold-deep)) 100% 100% / 1px 22px;
+  background-repeat: no-repeat;
+  opacity: 0.75;
+}
+/* pricing rows settle one after the other once the ticket is in view */
+.om-pack.is-in .om-price-row {
+  animation: omFadeUp 700ms var(--ease, ease) both;
+}
+.om-pack.is-in .om-price-row:nth-child(2) { animation-delay: 120ms; }
+.om-pack.is-in .om-price-row:nth-child(3) { animation-delay: 220ms; }
+.om-pack.is-in .om-price-row:nth-child(4) { animation-delay: 320ms; }
+.om-pack.is-in .om-price-row:nth-child(5) { animation-delay: 420ms; }
+
+/* inclusion icons draw their own line-work */
+.om-inc-cell svg path {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+.om-inc-grid.is-in .om-inc-cell path {
+  animation: omDrawTime 1600ms var(--ease, ease) forwards;
+}
+@keyframes omDrawTime {
+  to { stroke-dashoffset: 0; }
+}
+.om-inc-grid.is-in .om-inc-cell:nth-child(2) path { animation-delay: 140ms; }
+.om-inc-grid.is-in .om-inc-cell:nth-child(3) path { animation-delay: 280ms; }
+.om-inc-grid.is-in .om-inc-cell:nth-child(4) path { animation-delay: 420ms; }
+.om-inc-grid.is-in .om-inc-cell:nth-child(5) path { animation-delay: 560ms; }
+.om-inc-grid.is-in .om-inc-cell:nth-child(6) path { animation-delay: 700ms; }
+
+/* motion hygiene for the new layer */
+.mk--flat .om-hero .om-kicker,
+.mk--flat .om-hero .om-talbiyah,
+.mk--flat .om-hero .om-div,
+.mk--flat .om-hero-title,
+.mk--flat .om-hero-sub,
+.mk--flat .om-hero-cue,
+.mk--flat .om-hero-orn,
+.mk--flat .om-niyya-medallion,
+.mk--flat .om-thread i,
+.mk--flat .om-arch-frame path,
+.mk--flat .om-arch-img img,
+.mk--flat .om-arch figcaption span,
+.mk--flat .om-arch figcaption em,
+.mk--flat .om-pack.is-in .om-price-row,
+.mk--flat .om-inc-grid.is-in .om-inc-cell path {
+  animation: none;
+}
+.mk--flat .om-thread i { transform: scaleY(1); }
+.mk--flat .om-arch-frame path,
+.mk--flat .om-inc-cell svg path { stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .om-hero .om-kicker,
+  .om-hero .om-talbiyah,
+  .om-hero .om-div,
+  .om-hero-title,
+  .om-hero-sub,
+  .om-hero-cue,
+  .om-hero-orn,
+  .om-niyya-medallion,
+  .om-thread i,
+  .om-arch-frame path,
+  .om-arch-img img,
+  .om-arch figcaption span,
+  .om-arch figcaption em,
+  .om-pack.is-in .om-price-row,
+  .om-inc-grid.is-in .om-inc-cell path {
+    animation: none;
+  }
+  .om-thread i { transform: scaleY(1); }
+  .om-arch-frame path,
+  .om-inc-cell svg path { stroke-dashoffset: 0; }
+}

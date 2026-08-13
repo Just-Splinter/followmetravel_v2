@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
 import { useTravelData } from "../context/TravelDataContext";
 import { heroSlidesFromPackages, fallbackHeroSlides, isHeroSlideDoc } from "../services/heroSlides";
+import { isOmraDoc } from "../services/omra";
+import { OmraTeaser } from "./OmraPage";
 import Header from "./Header";
 import Hero from "./Hero";
 import HeroSearch from "./HeroSearch";
@@ -25,7 +27,7 @@ export default function LandingPage() {
   }, [packages]);
 
   const realPackages = useMemo(
-    () => (packages || []).filter((p) => !isHeroSlideDoc(p)),
+    () => (packages || []).filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p)),
     [packages]
   );
 
@@ -57,6 +59,7 @@ export default function LandingPage() {
         <Values />
         <Stats />
         <Adventures adventures={adventures} heroSlides={heroSlides} />
+        <OmraTeaser packages={packages} />
         <Testimonials testimonials={testimonials} />
         <CtaBand />
       </main>
