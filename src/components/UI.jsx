@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import styles from 'src/styles/UI.module.css'
+import styles from '../styles/UI.module.css'
 
 // ── Button ────────────────────────────────────────────────────────────────────
 export function Button({ children, variant = 'default', size = 'md', onClick, type = 'button', disabled, style }) {
