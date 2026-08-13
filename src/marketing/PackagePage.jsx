@@ -8,6 +8,8 @@ import { Footer } from "./Sections";
 import { Reveal, Arrow } from "./ui";
 import BookingFlow from "./BookingFlow";
 import { upcomingDepartures } from "./dates";
+import GeoMap from "./GeoMap";
+import { resolvePlace } from "./geo";
 import "./marketing.css";
 
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -90,6 +92,10 @@ export default function PackagePage() {
 
   const dates = useMemo(() => upcomingDepartures(pkg?.departureDates), [pkg]);
   const cats = pkg?.hotelCategories || [];
+  const place = useMemo(
+    () => (pkg ? resolvePlace(pkg.destination, pkg.destinationAccent, pkg.title, pkg.country) : null),
+    [pkg]
+  );
 
   const chapters = useMemo(() => {
     if (!pkg) return [];
@@ -98,10 +104,11 @@ export default function PackagePage() {
     if ((pkg.days || []).length) list.push({ id: "ch-days", label: pkg.itineraryTitle || t("pk_days") });
     if (cats.length) list.push({ id: "ch-hotels", label: t("pk_formules") });
     if (dates.length) list.push({ id: "ch-dates", label: t("pk_dates") });
+    if (place) list.push({ id: "ch-map", label: t("pk_map") });
     if (images.length > 1) list.push({ id: "ch-gallery", label: t("pk_gallery") });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pkg, cats.length, dates.length, images.length, t]);
+  }, [pkg, cats.length, dates.length, images.length, place, t]);
 
   /* scrollspy for the chapter rail */
   useEffect(() => {
@@ -270,15 +277,17 @@ export default function PackagePage() {
                   <ol className="mk-pk-spine">
                     {pkg.days.map((d, i) => (
                       <Reveal as="li" key={d.id ?? i} delay={(i % 3) * 70}>
-                        <div className="mk-pk-spine-num">{d.num || String(i + 1).padStart(2, "0")}</div>
+                        <div className="mk-pk-spine-mark" aria-hidden="true">
+                          <i>{d.num || String(i + 1).padStart(2, "0")}</i>
+                        </div>
                         <div className="mk-pk-spine-body">
+                          {d.theme && <em className="mk-pk-spine-kicker">{d.theme}</em>}
                           <h3>
                             {d.title}
                             {d.badge && <span className="mk-sr-chip">{d.badge}</span>}
                           </h3>
-                          {d.theme && <p className="mk-pk-spine-theme">{d.theme}</p>}
                           {(d.activities || []).length > 0 && (
-                            <ul>
+                            <ul className="mk-pk-spine-acts">
                               {d.activities.map((a, j) => (
                                 <li key={a.id ?? j}>
                                   {a.label}
@@ -287,7 +296,11 @@ export default function PackagePage() {
                               ))}
                             </ul>
                           )}
-                          {d.image && <img src={d.image} alt="" loading="lazy" />}
+                          {d.image && (
+                            <figure className="mk-pk-spine-fig">
+                              <img src={d.image} alt="" loading="lazy" />
+                            </figure>
+                          )}
                         </div>
                       </Reveal>
                     ))}
@@ -356,6 +369,19 @@ export default function PackagePage() {
                       </Reveal>
                     ))}
                   </div>
+                </section>
+              )}
+
+              {/* Location map */}
+              {place && (
+                <section className="mk-pk-chap" id="ch-map" data-chapter="">
+                  <ChapHead n={++chapN} title={t("pk_map")} />
+                  <GeoMap
+                    markers={[{ lat: place.latlng[0], lng: place.latlng[1], label: pkg.country }]}
+                    height={340}
+                    zoom={place.city ? 8 : 5}
+                    className="mk-pk-geomap"
+                  />
                 </section>
               )}
             </div>

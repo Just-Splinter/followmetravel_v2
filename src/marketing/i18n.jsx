@@ -242,6 +242,7 @@ const DICT = {
     pk_photos: "photos",
     pk_scroll: "Défiler",
     pk_edition: "Édition",
+    pk_map: "Localisation",
     subjects: ["Demande de réservation", "Modification de voyage", "Annulation", "Demande de devis", "Autre"],
   },
 
@@ -484,6 +485,7 @@ const DICT = {
     pk_photos: "photos",
     pk_scroll: "Scroll",
     pk_edition: "Edition",
+    pk_map: "Location",
     subjects: ["Booking request", "Trip modification", "Cancellation", "Quote request", "Other"],
   },
 
@@ -726,6 +728,7 @@ const DICT = {
     pk_photos: "صور",
     pk_scroll: "مرر",
     pk_edition: "إصدار",
+    pk_map: "الموقع",
     subjects: ["طلب حجز", "تعديل رحلة", "إلغاء", "طلب عرض سعر", "أخرى"],
   },
 };

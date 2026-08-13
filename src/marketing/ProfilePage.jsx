@@ -111,16 +111,38 @@ export default function ProfilePage() {
 
   return (
     <div className="mk">
-      <Header />
+      <Header light />
       <main style={{ minHeight: "72vh" }}>
-        <div className="mk-wrap mk-page-head" style={{ paddingBottom: 34 }}>
-          <Reveal as="span" className="mk-eyebrow">{t("pf_eyebrow")}</Reveal>
-          <h1 className="mk-h2" style={{ marginTop: 16 }}>
-            {user ? `${t("pf_title")}, ${firstName}` : t("bk_auth_t")}
-          </h1>
-        </div>
+        <section className="mk-pf-hero mk-grain">
+          <img src="/hero/kerala.avif" alt="" fetchPriority="high" />
+          <div className="mk-pf-hero-shade" aria-hidden="true" />
+          <div className="mk-wrap mk-pf-hero-in">
+            <span className="mk-eyebrow">{t("pf_eyebrow")}</span>
+            <h1 className="mk-pf-hero-ttl">
+              <span className="mk-line">
+                <span className="mk-rise">{user ? `${t("pf_title")}, ${firstName}` : t("bk_auth_t")}</span>
+              </span>
+            </h1>
+            {user && (
+              <dl className="mk-pf-hero-dek">
+                {reservations.length > 0 && (
+                  <div>
+                    <dt>{t("pf_tab_res")}</dt>
+                    <dd>{String(reservations.length).padStart(2, "0")}</dd>
+                  </div>
+                )}
+                {user?.$createdAt && (
+                  <div>
+                    <dt>{t("pf_member_since")}</dt>
+                    <dd>{dateFmt.format(new Date(user.$createdAt))}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </div>
+        </section>
 
-        <div className="mk-wrap" style={{ paddingBottom: 110 }}>
+        <div className="mk-wrap" style={{ paddingBottom: 110, paddingTop: 48 }}>
           {authLoading ? null : !user ? (
             <div className="mk-pf-gate">
               <p className="mk-lead">{t("bk_auth_d")}</p>

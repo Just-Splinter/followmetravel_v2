@@ -7,6 +7,8 @@ import Header from "./Header";
 import { Footer } from "./Sections";
 import { Arrow } from "./ui";
 import QuickPrice from "./QuickPrice";
+import GeoMap from "./GeoMap";
+import { resolvePlace } from "./geo";
 import { useClickOutside } from "../components/ClickOutSide";
 import "./marketing.css";
 
@@ -127,11 +129,20 @@ export default function SearchPage() {
     }));
   }, [destinations, countries, items, destId, country]);
 
-  const markers = useMemo(() => {
-    const byCountry = {};
-    items.forEach((i) => { if (i.country !== "—") byCountry[i.country] = (byCountry[i.country] || 0) + 1; });
-    return Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [items]);
+  const geoMarkers = useMemo(() => {
+    const groups = {};
+    items.forEach((i) => {
+      const place = resolvePlace(i.title, i.country);
+      if (!place) return;
+      const g = (groups[place.key] ||= { lat: place.latlng[0], lng: place.latlng[1], count: 0, country: i.country, label: place.key });
+      g.count += 1;
+    });
+    return Object.values(groups).map((g) => ({
+      ...g,
+      active: country === g.country,
+      onClick: () => { setCountry((v) => (v === g.country ? "" : g.country)); setPage(1); },
+    }));
+  }, [items, country]);
 
   const quick = useMemo(() => {
     const [a, b] = bounds;
@@ -200,21 +211,8 @@ export default function SearchPage() {
   /* ── sidebar ── */
   const sidebar = (
     <div className="mk-sr-side">
-      {/* visual block with count markers (map-preview slot) */}
-      <div className="mk-sr-map">
-        <img src="/hero/bali3.avif" alt="" />
-        {markers.map(([c, n], i) => (
-          <button
-            key={c}
-            className={`mk-sr-pin ${country === c ? "is-active" : ""}`}
-            style={{ insetInlineStart: `${[18, 58, 36, 72][i]}%`, top: `${[24, 18, 62, 52][i]}%` }}
-            onClick={() => { setCountry((v) => (v === c ? "" : c)); setPage(1); }}
-            title={c}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
+      {/* live map — one pin per resolved location, click filters */}
+      {geoMarkers.length > 0 && <GeoMap markers={geoMarkers} height={235} className="mk-sr-geomap" />}
 
       {facet.length > 0 && (
       <section className="mk-sr-block">
