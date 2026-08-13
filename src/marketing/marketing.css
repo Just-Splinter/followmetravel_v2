@@ -613,7 +613,7 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(rgba(15, 12, 9, 0.14), rgba(15, 12, 9, 0.14)),
+    linear-gradient(rgba(15, 12, 9, 0.27), rgba(15, 12, 9, 0.27)),
     linear-gradient(
       to top,
       rgba(15, 12, 9, 0.74) 0%,
@@ -634,6 +634,28 @@
       rgba(15, 12, 9, 0) 36%
     );
 }
+/* WebGL flow layer — sits above the DOM slides, below the shade */
+.mk-hero-gl {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+.mk-hero.is-gl .mk-hero-gl {
+  opacity: 1;
+}
+.mk-hero-gl canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.mk-hero.is-gl .mk-hero-img {
+  transition: none;
+}
+
 .mk-hero-in {
   position: relative;
   z-index: 2;

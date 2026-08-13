@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLocale } from "./i18n";
 import { Arrow } from "./ui";
 import { slideBg, slideCard } from "../services/heroSlides";
+import HeroFlow from "./HeroFlow";
 
 const HERO_MS = 6500;
 
@@ -17,6 +18,17 @@ export default function Hero({ slides }) {
   const navigate = useNavigate();
   const timer = useRef(null);
   const N = slides.length;
+
+  // WebGL flow hero on capable desktop pointers only; DOM crossfade elsewhere
+  const [glOn, setGlOn] = useState(false);
+  const [glDead, setGlDead] = useState(false);
+  const glWanted =
+    !glDead &&
+    N > 0 &&
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+    !new URLSearchParams(window.location.search).has("flat");
 
   const goTo = useCallback(
     (i) => {
@@ -78,7 +90,7 @@ export default function Hero({ slides }) {
 
   return (
     <section
-      className="mk-hero mk-grain"
+      className={`mk-hero mk-grain ${glOn ? "is-gl" : ""}`}
       id="top"
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
@@ -92,6 +104,14 @@ export default function Hero({ slides }) {
             style={{ backgroundImage: `url(${slideBg(sl)})` }}
           />
         ))}
+        {glWanted && (
+          <HeroFlow
+            slides={slides}
+            active={active}
+            onReady={() => setGlOn(true)}
+            onFail={() => { setGlOn(false); setGlDead(true); }}
+          />
+        )}
         <div className="mk-hero-shade" />
       </div>
 
