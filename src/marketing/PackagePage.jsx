@@ -10,6 +10,7 @@ import BookingFlow from "./BookingFlow";
 import { upcomingDepartures } from "./dates";
 import GeoMap from "./GeoMap";
 import { resolvePlace } from "./geo";
+import { localizeData } from "../services/translate";
 import "./marketing.css";
 
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -79,7 +80,11 @@ function ChapHead({ n, title, badge }) {
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
-export default function PackagePage() {
+/* previewDoc: when set (dashboard editor preview), the page renders that
+   document instead of fetching, drops Header/Footer, and the booking flow
+   refuses to submit. */
+export default function PackagePage({ previewDoc = null }) {
+  const preview = !!previewDoc;
   const { fetchById, selectedPkg, loading } = usePackages();
   const { t, locale, isRTL } = useLocale();
 
@@ -94,16 +99,19 @@ export default function PackagePage() {
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
 
   useEffect(() => {
+    if (preview) return;
     if (pkgId) fetchById(pkgId).catch(() => {});
     window.scrollTo(0, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkgId]);
 
-  const doc = selectedPkg;
-  const pkg = useMemo(
-    () => (doc ? { ...(typeof doc.data === "object" ? doc.data : {}), $id: doc.$id, title: doc.title, basePrice: doc.basePrice, country: doc.country } : null),
-    [doc]
-  );
+  const doc = previewDoc || selectedPkg;
+  const pkg = useMemo(() => {
+    if (!doc) return null;
+    const raw = typeof doc.data === "object" && doc.data !== null ? doc.data : (() => { try { return JSON.parse(doc.data) || {}; } catch { return {}; } })();
+    const d = localizeData(raw, locale);
+    return { ...d, $id: doc.$id, title: doc.title, basePrice: doc.basePrice, country: d.country || doc.country };
+  }, [doc, locale]);
 
   const images = useMemo(() => {
     if (!pkg) return [];
@@ -162,12 +170,12 @@ export default function PackagePage() {
 
     const onScroll = () => calc();
     const onResize = () => { measure(); calc(); };
-    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
     window.addEventListener("resize", onResize);
     marker.style.opacity = "1";
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };
   }, [pkg]);
@@ -243,7 +251,7 @@ export default function PackagePage() {
 
   return (
     <div className={`mk ${flat ? "mk--flat" : ""}`}>
-      <Header />
+      {!preview && <Header />}
       <main>
         {/* ── Composed hero: title tucked behind the mounted plate ── */}
         <section className="mk-pk-hero2 mk-grain">
@@ -512,7 +520,7 @@ export default function PackagePage() {
           <button className="mk-btn mk-btn--sm" onClick={() => openBooking()}>{t("pk_book")}</button>
         </div>
       </main>
-      <Footer />
+      {!preview && <Footer />}
 
       {lb !== null && (
         <Lightbox
@@ -527,6 +535,7 @@ export default function PackagePage() {
         <ReservationProvider>
           <BookingFlow
             pkg={pkg}
+            preview={preview}
             prefill={{ adults: searchParams.get("adults"), date: searchParams.get("date") }}
             initialDateIdx={bookDateIdx}
             onClose={() => { setBooking(false); setBookDateIdx(null); }}

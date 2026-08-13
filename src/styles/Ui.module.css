@@ -122,6 +122,13 @@
 .closeBtn:hover { background: var(--surface-3); color: var(--text-primary); }
 .modalBody { padding: 1.5rem; }
 
+/* fullscreen variant — the packages editor takes the whole viewport */
+.modalFull {
+  width: 100vw; height: 100svh; max-height: none;
+  border-radius: 0; animation: none;
+}
+.modalBodyFull { padding: 0; height: 100%; overflow-y: auto; }
+
 /* ─── Stat card ──────────────────────────────────────────────────────────── */
 .statCard {
   background: var(--surface); border: 1px solid var(--border);

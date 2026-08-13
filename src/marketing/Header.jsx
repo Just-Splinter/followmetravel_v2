@@ -58,7 +58,7 @@ export default function Header({ light = false }) {
         <div className="mk-wrap">
           <div className="mk-header-in">
             <a className="mk-logo" href="/" onClick={(e) => { e.preventDefault(); go("/#top"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-              Follow<b>Me</b>Travel
+              <img className="mk-logo-img" src="/logo-256.png" alt="Follow Me Travel" />
             </a>
 
             <nav className="mk-nav" aria-label="principal">

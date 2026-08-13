@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocale } from "./i18n";
+import { localizeData } from "../services/translate";
 import { Reveal, Lines, SectionHead, ArrowLink, Button, Arrow, CountUp } from "./ui";
 import { slideCard } from "../services/heroSlides";
 import QuickPrice from "./QuickPrice";
@@ -76,6 +77,7 @@ export function Trips({ packages }) {
       (packages || []).slice(0, 6).map((p) => {
         let data = {};
         try { data = JSON.parse(p.data) || {}; } catch { /* raw */ }
+        data = localizeData(data, locale);
         return {
           id: p.$id,
           title: p.title || data.destination || "—",
@@ -86,7 +88,7 @@ export function Trips({ packages }) {
           departureDates: data.departureDates || [],
         };
       }),
-    [packages]
+    [packages, locale]
   );
 
   if (!items.length) return null;
@@ -355,7 +357,7 @@ export function Footer() {
         <div className="mk-footer-grid">
           <div className="mk-footer-brand">
             <a className="mk-logo" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-              Follow<b>Me</b>Travel
+              <img className="mk-logo-img mk-logo-img--foot" src="/logo-256.png" alt="Follow Me Travel" />
             </a>
             <p>{t("footer_tag")}</p>
             <div className="mk-footer-contact">

@@ -145,7 +145,14 @@ export default function Starter() {
               </TravelLayout>
             }
           />
-          <Route path="/contact" element={<MarketingContactPage />} />
+          <Route
+            path="/contact"
+            element={
+              <TravelLayout>
+                <MarketingContactPage />
+              </TravelLayout>
+            }
+          />
           <Route
             path="/omra"
             element={

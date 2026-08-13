@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTravelData } from "../context/TravelDataContext";
 import HeroSlidesManager from "../components/HeroSlidesManager";
 import OmraManager from "../components/OmraManager";
+import ContactImagesManager from "../components/ContactImagesManager";
 import { parseHeroSlide } from "../services/heroSlides";
 import { parseOmra } from "../services/omra";
 import "../styles/Analyticsdashboard.css";
@@ -16,6 +17,10 @@ const SCHEMAS = {
   omra: {
     label: "Omra", icon: "🕋", custom: true, dataKey: "packages",
     countOf: (docs) => (docs || []).filter((d) => parseOmra(d)).length,
+  },
+  contact: {
+    label: "Contact", icon: "📍", custom: true, dataKey: "packages",
+    countOf: () => 3,
   },
   destinations: {
     label: "Destination", actionsKey: "destinationActions", dataKey: "destinations",
@@ -250,7 +255,7 @@ export default function TravelCMS() {
 
       <div className="em-main">
         {schema.custom ? (
-          col === "omra" ? <OmraManager /> : <HeroSlidesManager />
+          col === "omra" ? <OmraManager /> : col === "contact" ? <ContactImagesManager /> : <HeroSlidesManager />
         ) : (
         <div className="cms-table-card">
 

@@ -22,7 +22,7 @@ const DEFAULT_SUPPLEMENTS = [
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
 
 /* ─── Wizard ─────────────────────────────────────────────────────────────── */
-export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = null }) {
+export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = null, preview = false }) {
   const { t, locale } = useLocale();
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const { createReservation } = useReservation();
@@ -148,6 +148,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
 
   const submit = async () => {
     if (!leadValid || sending) return;
+    if (preview) { setError(t("bk_preview")); return; }
     setSending(true);
     setError(null);
     try {
@@ -232,7 +233,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
         <button className="mk-btn" onClick={onClose}>{t("bk_close")}</button>
       </div>
     );
-  } else if (!authLoading && !user) {
+  } else if (!preview && !authLoading && !user) {
     body = (
       <div className="mk-bk-auth">
         <h3>{t("bk_auth_t")}</h3>

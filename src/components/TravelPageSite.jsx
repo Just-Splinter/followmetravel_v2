@@ -7,6 +7,7 @@ import ScrollToTop, { DestinationCard, Footer } from "../sites/commun";
 import HeroFoxico from "./HeroFoxico";
 import { heroSlidesFromPackages, fallbackHeroSlides, isHeroSlideDoc } from "../services/heroSlides";
 import { isOmraDoc } from "../services/omra";
+import { isContactDoc } from "../services/siteContact";
 import { useNavigate } from "react-router-dom";
 import { useEvents } from "../context/EventsContext";
 import { Modal } from "./UI";
@@ -1409,7 +1410,7 @@ export default function TravelPage() {
   // Hero slides come from the products collection (data.kind === "hero-slide");
   // fall back to the built-in set until the backend is seeded from the CMS.
   const heroSlides = heroSlidesFromPackages(packages);
-  const displayedPackages = packages.filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p));
+  const displayedPackages = packages.filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p) && !isContactDoc(p));
 
   const maxIndex = Math.max(0, destinations.length - itemsPerPage);
 

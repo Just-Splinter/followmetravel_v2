@@ -21,7 +21,7 @@ export default function GeoMap({ markers = [], height = 260, zoom = 5, className
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution: "© OpenStreetMap · © CARTO",
       subdomains: "abcd",
-      maxZoom: 12,
+      maxZoom: 19,
     }).addTo(map);
     map.setView([31.7917, -7.0926], zoom);
     mapRef.current = map;

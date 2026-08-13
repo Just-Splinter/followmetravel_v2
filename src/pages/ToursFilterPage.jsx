@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Grid3x3, List, LayoutList, SlidersHorizontal, MapPin, Star, Clock } from "lucide-react";
 import { isHeroSlideDoc } from "../services/heroSlides";
 import { isOmraDoc } from "../services/omra";
+import { isContactDoc } from "../services/siteContact";
 import "../styles/ToursFilterPage.css";
 
 
@@ -460,7 +461,7 @@ export default function ToursFilterPage() {
   ].filter(Boolean).length;
 
   const results = useMemo(() => {
-    let list = (packages || []).filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p));
+    let list = (packages || []).filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p) && !isContactDoc(p));
 
     if (search.trim()) {
       const q = search.toLowerCase();

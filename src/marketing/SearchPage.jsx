@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTravelData } from "../context/TravelDataContext";
 import { isHeroSlideDoc } from "../services/heroSlides";
 import { isOmraDoc } from "../services/omra";
+import { isContactDoc } from "../services/siteContact";
+import { localizeData } from "../services/translate";
 import { useLocale } from "./i18n";
 import Header from "./Header";
 import { Footer } from "./Sections";
@@ -58,9 +60,9 @@ export default function SearchPage() {
   const items = useMemo(
     () =>
       (packages || [])
-        .filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p))
+        .filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p) && !isContactDoc(p))
         .map((p) => {
-          const d = parse(p);
+          const d = localizeData(parse(p), locale);
           return {
             id: p.$id,
             title: p.title || d.destination || "—",
@@ -78,7 +80,7 @@ export default function SearchPage() {
             tagline: d.tagline || d.subtitleItalic || "",
           };
         }),
-    [packages]
+    [packages, locale]
   );
 
   const bounds = useMemo(() => {

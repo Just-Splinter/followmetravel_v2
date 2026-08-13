@@ -6,6 +6,7 @@ import CreatePackageModal from "../components/CreatePackageModal";
 import { TravelDataProvider } from "../context/TravelDataContext";
 import { useClickOutside } from "../components/ClickOutSide";
 import { toast } from "react-toastify";
+import { withTranslations } from "../services/translate";
 import "../styles/Analyticsdashboard.css";
 import "../styles/PackagesPage.css";
 
@@ -259,6 +260,26 @@ export default function PackagesManager() {
 
   const [loadingStatusId, setLoadingStatusId] = useState(null);
 
+  // one-call LLM translation of a package's content (EN/AR) via OpenRouter
+  const [translatingId, setTranslatingId] = useState(null);
+  const handleTranslate = async (pkg) => {
+    if (translatingId) return;
+    setTranslatingId(pkg.$id);
+    try {
+      // translate the RAW stored blob, not the normalized/enriched copy
+      const raw = rawPackages.find((r) => r.$id === pkg.$id);
+      let data = raw?.data ?? {};
+      if (typeof data === "string") { try { data = JSON.parse(data) || {}; } catch { data = {}; } }
+      const next = await withTranslations(data);
+      await updatePackage(pkg.$id, { data: JSON.stringify(next) });
+      toast.success("Traductions EN/AR mises à jour");
+    } catch (e) {
+      toast.error("Traduction échouée : " + (e?.message || e));
+    } finally {
+      setTranslatingId(null);
+    }
+  };
+
   const statusMessages = {
     published: {
       success: "Package publié avec succès.",
@@ -468,6 +489,8 @@ export default function PackagesManager() {
                   setDetailPkg(pkg);
                   setOpenEdit(true);
                 }}
+                onTranslate={() => handleTranslate(pkg)}
+                translating={translatingId === pkg.$id}
                 onToggleStatus={(status) =>
                   setConfirmStatus({
                     id: pkg.$id,
@@ -505,6 +528,8 @@ export default function PackagesManager() {
                   setDetailPkg(pkg);
                   setOpenEdit(true);
                 }}
+                onTranslate={() => handleTranslate(pkg)}
+                translating={translatingId === pkg.$id}
                 onToggleStatus={(status) =>
                   setConfirmStatus({
                     id: pkg.$id,
@@ -520,6 +545,7 @@ export default function PackagesManager() {
 
       {detailPkg && openDetail && (
         <DetailPanel pkg={detailPkg} onClose={() => setOpenDetail(false)} onEdit={() => setOpenEdit(true)}
+          onTranslate={() => detailPkg && handleTranslate(detailPkg)} translating={translatingId === detailPkg?.$id}
           onDelete={() => { setConfirmDelete(detailPkg); setDetailPkg(null); setOpenDetail(false) }} />
       )}
 
@@ -615,7 +641,7 @@ export default function PackagesManager() {
 }
 
 // ── Package Card ──────────────────────────────────────────────────────
-function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit, onDuplicate, loadingStatus, onEditInfo }) {
+function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit, onDuplicate, loadingStatus, onEditInfo, onTranslate, translating }) {
   const cat = CATEGORY_META[pkg._category] || CATEGORY_META.summer;
   const st = STATUS_META[pkg.status] || STATUS_META.draft;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -737,6 +763,15 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
           <button onClick={e => { e.stopPropagation(); onEdit(); }} className="em-action-btn primary" style={{ flex: 1, justifyContent: "center" }}>
             <i className="ti ti-edit" aria-hidden="true" /> Package Editor
           </button>
+          <button
+            onClick={e => { e.stopPropagation(); onTranslate && onTranslate(); }}
+            className="em-action-btn"
+            disabled={translating}
+            title="Mettre à jour les traductions (EN/AR)"
+            style={{ border: "1px solid #e2e8f0", justifyContent: "center", minWidth: 40 }}
+          >
+            {translating ? "…" : <i className="ti ti-language" aria-hidden="true" />}
+          </button>
         </div>
       </div>
     </div>
@@ -752,7 +787,7 @@ function ListHeader() {
   );
 }
 
-function PackageRow({ pkg, selected, onSelect, onDetail, onDelete, onEdit }) {
+function PackageRow({ pkg, selected, onSelect, onDetail, onDelete, onEdit, onTranslate, translating }) {
   const cat = CATEGORY_META[pkg._category] || CATEGORY_META.summer;
   const st = STATUS_META[pkg.status] || STATUS_META.draft;
   return (
@@ -794,7 +829,7 @@ function PackageRow({ pkg, selected, onSelect, onDetail, onDelete, onEdit }) {
 }
 
 // ── Detail panel ──────────────────────────────────────────────────────
-function DetailPanel({ pkg, onClose, onDelete, onEdit }) {
+function DetailPanel({ pkg, onClose, onDelete, onEdit, onTranslate, translating }) {
   const st = STATUS_META[pkg.status] || STATUS_META.draft;
   const [tab, setTab] = useState("overview");
 
@@ -843,6 +878,9 @@ function DetailPanel({ pkg, onClose, onDelete, onEdit }) {
         <div className="pkg-detail-footer">
           <button onClick={onDelete} className="em-action-btn danger" style={{ border: "1px solid #fca5a5", background: "#fef2f2" }}>
             <i className="ti ti-trash" aria-hidden="true" /> Supprimer
+          </button>
+          <button onClick={onTranslate} disabled={translating} className="em-action-btn" title="Mettre à jour les traductions (EN/AR)" style={{ border: "1px solid #e2e8f0" }}>
+            {translating ? "…" : <i className="ti ti-language" aria-hidden="true" />}
           </button>
           <button onClick={onEdit} className="em-action-btn primary" style={{ flex: 1, justifyContent: "center" }}>
             <i className="ti ti-edit" aria-hidden="true" /> Modifier ce package
@@ -1018,7 +1056,7 @@ function Section({ title, children }) {
 // ── Editor modal ──────────────────────────────────────────────────
 function PackageEditorModal({ pkg, onChange, onSave, onClose }) {
   return (
-    <Modal title={pkg?._name || pkg?.tagline || "Nouveau package"} onClose={onClose} width="100%">
+    <Modal onClose={onClose} fullscreen>
       {pkg && (
         <PackageEditorPage
           pkg={pkg}

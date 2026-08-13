@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import styles from '../styles/UI.module.css'
 
 // ── Button ────────────────────────────────────────────────────────────────────
@@ -85,17 +86,26 @@ export function Textarea({ label, value, onChange, placeholder, rows = 3 }) {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-export function Modal({ title, onClose, children, width = 600 }) {
+export function Modal({ title, onClose, children, width = 600, fullscreen = false }) {
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen, onClose]);
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.modal} style={{ width }}>
-        {title && (
+      <div
+        className={`${styles.modal} ${fullscreen ? styles.modalFull : ""}`}
+        style={fullscreen ? undefined : { width }}
+      >
+        {title && !fullscreen && (
           <div className={styles.modalHeader}>
             <span className={styles.modalTitle}>{title}</span>
             <button className={styles.closeBtn} onClick={onClose} aria-label="Fermer">✕</button>
           </div>
         )}
-        <div className={styles.modalBody}>
+        <div className={fullscreen ? styles.modalBodyFull : styles.modalBody}>
           {children}
         </div>
       </div>
