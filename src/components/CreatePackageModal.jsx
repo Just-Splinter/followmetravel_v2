@@ -403,7 +403,6 @@ const C = {
 // ── Styles ────────────────────────────────────────────────────────────
 const S = {
   root: {
-    marginTop: 100,
     background: "var(--color-background-primary)",
     borderRadius: "var(--border-radius-lg)",
     overflow: "hidden",
