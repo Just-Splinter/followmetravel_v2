@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import styles from "../styles/Login.module.css";
 import { useAuth } from "../context/AuthContext";
 import { login, requestPasswordRecovery } from "../services/appwrite";
+import "../marketing/marketing.css";
 
+/** Espace équipe — the dashboard sign-in, in the house style. */
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -59,29 +60,20 @@ export default function LoginPage() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  setError("");
-  setLoading(true);
-
-  try {
-    await login(form.email, form.password);
-    await refreshUser();
-
-    navigate("/");
-  } catch (err) {
-    console.error(err);
-
-    // Message Appwrite
-    if (err?.message) {
-      setError(err.message);
-    } else {
-      setError("Unable to login. Please try again.");
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await login(form.email, form.password);
+      await refreshUser();
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Connexion impossible. Veuillez réessayer.");
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className={styles.root}>
@@ -198,6 +190,7 @@ export default function LoginPage() {
           </>
         )}
       </div>
+
     </div>
   );
 }
