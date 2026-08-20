@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { login, requestPasswordRecovery } from "../services/appwrite";
+import { login, logout, requestPasswordRecovery } from "../services/appwrite";
 import "../marketing/marketing.css";
 
 /** Espace équipe — the dashboard sign-in, in the house style. */
@@ -10,7 +10,19 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { refreshUser, loginWithGoogle } = useAuth();
+  const { user, loading: authLoading, refreshUser, loginWithGoogle } = useAuth();
+
+  // Appwrite refuses to open a second session on top of an existing one
+  // ("Creation of a session is prohibited when a session is active") — the
+  // most common way to land here already-authenticated is a stale session
+  // still in the browser (e.g. a previous login from this same machine).
+  // Redirect immediately rather than letting the form sit there ready to
+  // fail on submit.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(user.labels?.includes("admin") ? "/dashboard/home" : "/", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   // "forgot password" replaces the form in place rather than a separate
   // route — the request step only needs an email, no redirect/session state.
@@ -64,7 +76,20 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(form.email, form.password);
+      try {
+        await login(form.email, form.password);
+      } catch (err) {
+        // A session already exists (stale login from this browser, or the
+        // useEffect above hasn't caught up yet) — Appwrite refuses to open
+        // a second one on top of it. Clear it and retry once instead of
+        // just failing; this is also how "log in as someone else" works.
+        const isSessionConflict =
+          err?.cause?.type === "user_session_already_exists" ||
+          /session is active/i.test(err?.message || "");
+        if (!isSessionConflict) throw err;
+        await logout();
+        await login(form.email, form.password);
+      }
       await refreshUser();
       navigate("/");
     } catch (err) {
