@@ -1,4 +1,7 @@
-.root { display: flex; height: 100vh; overflow: hidden; }
+/* Content-side background only — the sidebar carries its own dark palette
+   (Sidebar.module.css), lifted from the marketing site's warm-paper system
+   rather than the generic white/navy the dashboard used before. */
+.root { display: flex; height: 100vh; overflow: hidden; background: #f6f2ea; }
 
 .main {
   flex: 1;
@@ -6,6 +9,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  background: #f6f2ea;
 }
 
 .header {
@@ -29,4 +33,14 @@
 .content {
   flex: 1;
   overflow-y: auto;
+}
+
+/* Suspense fallback while a lazy back-office chunk downloads. */
+.pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  font-size: 14px;
+  color: var(--color-text-tertiary, #9a9890);
 }

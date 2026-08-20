@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import { useLocale, LOCALES } from "./i18n";
+import { useAuth } from "../context/AuthContext";
+import { useFavorites } from "../context/FavoritesContext";
 
 /* ─── Reveal: adds .is-in when scrolled into view ──────────────────────────── */
 export function Reveal({ as: Tag = "div", delay = 0, className = "", children, ...rest }) {
@@ -84,6 +87,44 @@ export function Button({ children, onClick, href, variant = "", className = "" }
       {children}
       <span className="mk-btn-arrow"><Arrow size={14} /></span>
     </Tag>
+  );
+}
+
+/* ─── Favorite toggle (heart) ───────────────────────────────────────────────
+   Logged-out click: remembers the current page (AuthCallback reads
+   "afterLogin" from sessionStorage) and sends the visitor to Google login
+   instead of silently doing nothing. ─────────────────────────────────────── */
+export function FavoriteButton({ id, label, className = "" }) {
+  const { t } = useLocale();
+  const { user, loginWithGoogle } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const active = isFavorite(id);
+
+  const onClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      sessionStorage.setItem("afterLogin", window.location.pathname + window.location.search);
+      toast.info(t("fav_login"));
+      loginWithGoogle();
+      return;
+    }
+    toggleFavorite({ id, label }).catch(() => toast.error(t("fav_err")));
+  };
+
+  return (
+    <button
+      type="button"
+      className={`mk-fav-btn ${active ? "is-active" : ""} ${className}`}
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={active ? t("fav_remove") : t("fav_add")}
+      title={active ? t("fav_remove") : t("fav_add")}
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 20.5s-7.5-4.6-10-9.3C.4 8 1.8 4.5 5 3.4c2.2-.8 4.5.1 6 2 .1.1.3.3.5.6.6.7 1 1.2 1 1.2s.4-.5 1-1.2c.2-.3.4-.5.5-.6 1.5-1.9 3.8-2.8 6-2 3.2 1.1 4.6 4.6 3 7.8-2.5 4.7-10 9.3-10 9.3z" />
+      </svg>
+    </button>
   );
 }
 

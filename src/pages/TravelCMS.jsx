@@ -1,10 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Image as ImageIcon } from "lucide-react";
+import { toast } from "react-toastify";
 import { useTravelData } from "../context/TravelDataContext";
 import HeroSlidesManager from "../components/HeroSlidesManager";
 import OmraManager from "../components/OmraManager";
 import ContactImagesManager from "../components/ContactImagesManager";
+import EmailNotificationsManager from "../components/EmailNotificationsManager";
 import { parseHeroSlide } from "../services/heroSlides";
 import { parseOmra } from "../services/omra";
+import { emailSettingsFromPackages, EMAIL_TRIGGERS } from "../services/emailSettings";
+import StorageService from "../services/storage";
 import "../styles/Analyticsdashboard.css";
 import "../styles/TravelCMS.css";
 
@@ -22,11 +27,18 @@ const SCHEMAS = {
     label: "Contact", icon: "📍", custom: true, dataKey: "packages",
     countOf: () => 3,
   },
+  notifications: {
+    label: "Notification", icon: "📧", custom: true, dataKey: "packages",
+    countOf: (docs) => {
+      const settings = emailSettingsFromPackages(docs);
+      return EMAIL_TRIGGERS.filter((t) => settings?.triggers?.[t.key]?.enabled).length;
+    },
+  },
   destinations: {
     label: "Destination", actionsKey: "destinationActions", dataKey: "destinations",
     icon: "🗺️",
     fields: [
-      { key: "emoji", label: "Image URL", type: "url" },
+      { key: "emoji", label: "Image", type: "image" },
       { key: "name", label: "Name", type: "text" },
       { key: "listing", label: "Listing count", type: "text" },
       { key: "rating", label: "Rating", type: "text" },
@@ -39,7 +51,7 @@ const SCHEMAS = {
     label: "Tour", actionsKey: "tourActions", dataKey: "tours",
     icon: "✈️",
     fields: [
-      { key: "emoji", label: "Image URL", type: "url" },
+      { key: "emoji", label: "Image", type: "image" },
       { key: "name", label: "Name", type: "text" },
       { key: "loc", label: "Location", type: "text" },
       { key: "nights", label: "Duration", type: "text" },
@@ -53,7 +65,7 @@ const SCHEMAS = {
     label: "Adventure", actionsKey: "adventureActions", dataKey: "adventures",
     icon: "🏔️",
     fields: [
-      { key: "emoji", label: "Image URL", type: "url" },
+      { key: "emoji", label: "Image", type: "image" },
       { key: "name", label: "Title", type: "text" },
       { key: "category", label: "Category", type: "text" },
       { key: "gradient", label: "Gradient", type: "text" },
@@ -65,7 +77,7 @@ const SCHEMAS = {
     label: "Team member", actionsKey: "teamActions", dataKey: "team",
     icon: "👤",
     fields: [
-      { key: "emoji", label: "Photo URL", type: "url" },
+      { key: "emoji", label: "Photo", type: "image" },
       { key: "name", label: "Full name", type: "text" },
       { key: "role", label: "Role", type: "text" },
       { key: "email", label: "Email", type: "text" },
@@ -77,7 +89,7 @@ const SCHEMAS = {
     label: "Testimonial", actionsKey: "testimonialActions", dataKey: "testimonials",
     icon: "💬",
     fields: [
-      { key: "emoji", label: "Avatar URL", type: "url" },
+      { key: "emoji", label: "Avatar", type: "image" },
       { key: "name", label: "Name", type: "text" },
       { key: "role", label: "Role", type: "text" },
       { key: "text", label: "Review", type: "textarea" },
@@ -96,6 +108,55 @@ const BADGE_COLORS = {
 };
 
 const PAGE_SIZE = 8;
+
+// ─── Image upload field (replaces a raw URL text input with a real upload +
+// preview) ────────────────────────────────────────────────────────────────
+function ImageUploadField({ id, value, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      const uploaded = await StorageService.upload(file);
+      onChange(StorageService.getView(uploaded.$id));
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur lors de l'upload de l'image.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="cms-image-upload">
+      <div
+        className={`cms-image-upload-box ${value ? "has-image" : ""} ${uploading ? "uploading" : ""}`}
+        style={{ backgroundImage: value ? `url(${value})` : "none" }}
+        onClick={() => !uploading && inputRef.current?.click()}
+      >
+        {uploading ? (
+          <span className="cms-image-upload-hint">Envoi en cours…</span>
+        ) : value ? (
+          <span className="cms-image-upload-overlay">Changer l'image</span>
+        ) : (
+          <span className="cms-image-upload-hint">
+            <ImageIcon size={18} /> Choisir une image
+          </span>
+        )}
+        <input id={id} ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+      </div>
+      {value && !uploading && (
+        <button type="button" className="cms-image-upload-remove" onClick={() => onChange("")}>
+          ✕ Retirer l'image
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ─── FormModal ───────────────────────────────────────────────────────────────
 function FormModal({ schema, record, onSave, onClose }) {
@@ -136,6 +197,8 @@ function FormModal({ schema, record, onSave, onClose }) {
                   value={form[f.key]}
                   onChange={(e) => set(f.key, e.target.value)}
                 />
+              ) : f.type === "image" ? (
+                <ImageUploadField id={`f_${f.key}`} value={form[f.key]} onChange={(val) => set(f.key, val)} />
               ) : (
                 <input
                   id={`f_${f.key}`}
@@ -222,131 +285,136 @@ export default function TravelCMS() {
             <h1 className="cms-title">Contenu du site</h1>
             <p className="cms-subtitle">Hero, destinations, voyages, équipe et avis affichés sur le site public</p>
           </div>
-          {!schema.custom && (
-            <button className="em-primary-btn" onClick={openCreate}>
-              + Add {schema.label.toLowerCase()}
-            </button>
-          )}
         </div>
+      </div>
 
-        <div className="em-categories">
+      <div className="cms-shell">
+        <nav className="cms-sidenav">
           {Object.entries(SCHEMAS).map(([key, s]) => {
             const active = col === key;
             return (
               <button
                 key={key}
-                className={`em-category-tab ${active ? "active" : ""}`}
+                className={`cms-sidenav-item ${active ? "active" : ""}`}
                 onClick={() => { setCol(key); setSearch(""); }}
               >
-                <span>{s.icon}</span>
-                <span>{s.label}s</span>
-                <span className="em-category-count">
+                <span className="cms-sidenav-icon">{s.icon}</span>
+                <span className="cms-sidenav-label">{s.label}s</span>
+                <span className="cms-sidenav-count">
                   {s.countOf ? s.countOf(ctx[s.dataKey]) : (ctx[s.dataKey] ?? []).length}
                 </span>
               </button>
             );
           })}
-        </div>
-      </div>
+        </nav>
 
-      {/* Status messages */}
-      {ctx.loading && <p className="cms-status-bar loading">⏳ Loading…</p>}
-      {ctx.error && <p className="cms-status-bar error">⚠ {ctx.error.message}</p>}
-
-      <div className="em-main">
-        {schema.custom ? (
-          col === "omra" ? <OmraManager /> : col === "contact" ? <ContactImagesManager /> : <HeroSlidesManager />
-        ) : (
-        <div className="cms-table-card">
-
-          <div className="cms-table-head">
-            <div className="em-search-wrap" style={{ maxWidth: 280 }}>
-              <div className="em-search">
-                <span style={{ fontSize: 14, color: "#94a3b8" }}>🔍</span>
-                <input
-                  placeholder={`Search ${schema.label.toLowerCase()}s…`}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+        <div className="cms-content">
+          {!schema.custom && (
+            <div className="cms-content-toolbar">
+              <button className="em-primary-btn" onClick={openCreate}>
+                + Add {schema.label.toLowerCase()}
+              </button>
             </div>
-          </div>
+          )}
 
-          {slice.length === 0 ? (
-            <div className="em-empty">
-              <div className="em-empty-icon">📭</div>
-              <p className="em-empty-title">No {schema.label.toLowerCase()}s found</p>
-            </div>
+          {/* Status messages */}
+          {ctx.loading && <p className="cms-status-bar loading">⏳ Loading…</p>}
+          {ctx.error && <p className="cms-status-bar error">⚠ {ctx.error.message}</p>}
+
+          {schema.custom ? (
+            col === "omra" ? <OmraManager /> : col === "contact" ? <ContactImagesManager /> : col === "notifications" ? <EmailNotificationsManager /> : <HeroSlidesManager />
           ) : (
-            <div className="cms-table-wrap">
-              <table className="cms-table">
-                <thead>
-                  <tr>
-                    <th className="cms-th" style={{ width: 52 }}></th>
-                    <th className="cms-th">{schema.label}</th>
-                    {schema.cols.slice(1).map((c) => (
-                      <th key={c} className="cms-th">{c}</th>
-                    ))}
-                    <th className="cms-th" style={{ width: 90, textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {slice.map((r) => {
-                    const nk = schema.nameKey;
-                    return (
-                      <tr key={r.$id} className="cms-row">
-                        <td className="cms-td" style={{ paddingRight: 8 }}>
-                          {r.emoji
-                            ? <img src={r.emoji} className="cms-thumb" alt="" onError={(e) => { e.target.style.display = "none"; }} />
-                            : <div className="cms-thumb-empty">📷</div>}
-                        </td>
+            <div className="cms-table-card">
 
-                        <td className="cms-td">
-                          <span className="cms-name">{r[nk] || "—"}</span>
-                        </td>
-
-                        {schema.cols.slice(1).map((c) => (
-                          <td key={c} className={c === "status" ? "cms-td" : "cms-td cms-td-muted"}>
-                            {c === "status"
-                              ? <span className="cms-badge" style={BADGE_COLORS[r[c]] || { background: "rgba(0,0,0,0.05)", color: "#64748b" }}>{r[c] || "—"}</span>
-                              : r[c] || "—"}
-                          </td>
-                        ))}
-
-                        <td className="cms-td" style={{ textAlign: "right" }}>
-                          <div className="cms-actions">
-                            <button className="cms-icon-btn" onClick={() => openEdit(r)}>✎</button>
-                            <button className="cms-icon-btn danger" onClick={() => setDelId(r.$id)}>✕</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {pages > 1 && (
-            <div className="cms-pagination">
-              <span className="cms-pagination-info">
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-              </span>
-              <div style={{ display: "flex", gap: 4 }}>
-                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    className={`cms-page-btn ${p === page ? "active" : ""}`}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
-                ))}
+              <div className="cms-table-head">
+                <div className="em-search-wrap" style={{ maxWidth: 280 }}>
+                  <div className="em-search">
+                    <span style={{ fontSize: 14, color: "#94a3b8" }}>🔍</span>
+                    <input
+                      placeholder={`Search ${schema.label.toLowerCase()}s…`}
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
+
+              {slice.length === 0 ? (
+                <div className="em-empty">
+                  <div className="em-empty-icon">📭</div>
+                  <p className="em-empty-title">No {schema.label.toLowerCase()}s found</p>
+                </div>
+              ) : (
+                <div className="cms-table-wrap">
+                  <table className="cms-table">
+                    <thead>
+                      <tr>
+                        <th className="cms-th" style={{ width: 52 }}></th>
+                        <th className="cms-th">{schema.label}</th>
+                        {schema.cols.slice(1).map((c) => (
+                          <th key={c} className="cms-th">{c}</th>
+                        ))}
+                        <th className="cms-th" style={{ width: 90, textAlign: "right" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {slice.map((r) => {
+                        const nk = schema.nameKey;
+                        return (
+                          <tr key={r.$id} className="cms-row">
+                            <td className="cms-td" style={{ paddingRight: 8 }}>
+                              {r.emoji
+                                ? <img src={r.emoji} className="cms-thumb" alt="" onError={(e) => { e.target.style.display = "none"; }} />
+                                : <div className="cms-thumb-empty">📷</div>}
+                            </td>
+
+                            <td className="cms-td">
+                              <span className="cms-name">{r[nk] || "—"}</span>
+                            </td>
+
+                            {schema.cols.slice(1).map((c) => (
+                              <td key={c} className={c === "status" ? "cms-td" : "cms-td cms-td-muted"}>
+                                {c === "status"
+                                  ? <span className="cms-badge" style={BADGE_COLORS[r[c]] || { background: "rgba(0,0,0,0.05)", color: "#64748b" }}>{r[c] || "—"}</span>
+                                  : r[c] || "—"}
+                              </td>
+                            ))}
+
+                            <td className="cms-td" style={{ textAlign: "right" }}>
+                              <div className="cms-actions">
+                                <button className="cms-icon-btn" onClick={() => openEdit(r)}>✎</button>
+                                <button className="cms-icon-btn danger" onClick={() => setDelId(r.$id)}>✕</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {pages > 1 && (
+                <div className="cms-pagination">
+                  <span className="cms-pagination-info">
+                    Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+                  </span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                      <button
+                        key={p}
+                        className={`cms-page-btn ${p === page ? "active" : ""}`}
+                        onClick={() => setPage(p)}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-        )}
       </div>
 
       {formRecord !== null && (

@@ -1,9 +1,13 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AIAgentPanel } from "../components/AIAgent";
 import { usePackages } from "../context/PackagesContext";
 import MarketingPackagePreview from "../marketing/PackagePreview";
 import { withTranslations, translationConfigured } from "../services/translate";
+import { daysInMonth, parseDDMM, formatDDMM } from "../marketing/dates";
+import HotelPicker from "../components/HotelPicker";
 import StorageService from "../services/storage";
+import { ROOM_TYPES } from "../services/roomTypes";
+import { useHotels } from "../context/HotelsContext";
 import { toast } from "react-toastify";
 import {
   Save, Check, X, Plus, Upload,
@@ -183,8 +187,59 @@ function Accordion({ title, icon, children, defaultOpen = false }) {
 }
 
 // ─── Palette Sidebar ──────────────────────────────────────────────
+const PALETTE_SIDEBAR_MIN = 64;
+const PALETTE_SIDEBAR_MAX = 240;
+const PALETTE_SIDEBAR_WIDTH_KEY = "ed-palette-sidebar-width";
+
+/**
+ * Vertical drag handle that resizes an element's width.
+ * `dir` flips which way the width grows: 1 for a handle on the right edge
+ * (dragging right widens), -1 for a handle on the left edge (dragging left widens).
+ */
+function ResizeHandle({ width, setWidth, min, max, className, dir = 1, label }) {
+  const dragRef = useRef(null);
+
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startWidth: width };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    const delta = (e.clientX - dragRef.current.startX) * dir;
+    setWidth(Math.min(max, Math.max(min, dragRef.current.startWidth + delta)));
+  };
+
+  const onPointerUp = (e) => {
+    dragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  return (
+    <div
+      className={className}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+    />
+  );
+}
+
 function PaletteSidebar({ pkg, update, onClose }) {
   const [customOpen, setCustomOpen] = useState(false);
+  // Fixed width, not user-resizable (the resize handle lives on the editor
+  // form panel instead) — still read from storage so an old resized value
+  // from before that change keeps rendering the same width.
+  const [width] = useState(() => {
+    const stored = Number(localStorage.getItem(PALETTE_SIDEBAR_WIDTH_KEY));
+    return stored >= PALETTE_SIDEBAR_MIN && stored <= PALETTE_SIDEBAR_MAX
+      ? stored
+      : PALETTE_SIDEBAR_MIN;
+  });
   const currentId = pkg.paletteId || "orange";
 
   const handlePaletteSelect = (p) => {
@@ -207,9 +262,9 @@ function PaletteSidebar({ pkg, update, onClose }) {
   const ct = { ...DEFAULT_CUSTOM_THEME, ...(pkg.customTheme || {}) };
 
   return (
-    <div className="ed-palette-sidebar">
+    <div className="ed-palette-sidebar" style={{ "--ed-palette-width": `${width}px` }}>
       <div className="ed-palette-close" onClick={onClose} title="Fermer">
-        <X size={14} />
+        <X size={24} color="white" />
       </div>
 
       <div className="ed-palette-list">
@@ -349,6 +404,8 @@ function PaletteSidebar({ pkg, update, onClose }) {
           </div>
         </div>
       )}
+
+      
     </div>
   );
 }
@@ -807,10 +864,77 @@ function hotelCategoryNights(category) {
   return (category.hotels || []).reduce((sum, h) => sum + (Number(h.nights) || 0), 0);
 }
 
-function HotelCategoryItem({ category, isOpen, onToggle, onUpdate, onRemove, isOnly }) {
+// Fixed columns before the price columns start: "Hôtel", "Ville", "Nuits", "★".
+const priceColStart = 4;
+
+/**
+ * Per-package room allotment for one hotel row — the same physical hotel
+ * can be pooled differently across packages, so this lives on the hotel row
+ * itself (package data), not on the shared hotel catalog. `allotment` is a
+ * plain array parallel to `hotel.cols`/ROOM_TYPES[].colIdx, only shown for
+ * room types this row actually prices (cols[colIdx] > 0) — matches how
+ * BookingFlow reads cols by fixed index regardless of column header text.
+ */
+function HotelAllotmentRow({ hotel, headers, packageId, getBooked, onUpdateFields }) {
+  const allotment = hotel.allotment || [];
+  const types = ROOM_TYPES.filter((rt) => Number(hotel.cols?.[rt.colIdx]) > 0);
+  if (!types.length) return null;
+
+  const updateAllotment = (colIdx, total) => {
+    const next = [...allotment];
+    next[colIdx] = total;
+    onUpdateFields({ allotment: next });
+  };
+
+  return (
+    <div className="ed-hotel-avail-row">
+      {types.map((rt) => {
+        // Display label follows the formule's actual column header (which
+        // "surcharge from hotel" may have overridden), but getBooked() below
+        // still keys off rt.label — the fixed Triple/Double/Single/2–5 ans
+        // vocabulary is what BookingFlow actually writes onto a reservation.
+        // A hotel with very different room names won't match dispo tracking
+        // 1:1 — the trade-off of overriding column text only, not the
+        // underlying position-based type system.
+        const label = headers?.[priceColStart + rt.colIdx] || rt.label;
+        const total = Number(allotment[rt.colIdx]) || 0;
+        const booked = hotel.hotelId && packageId ? getBooked(hotel.hotelId, packageId, rt.label) : 0;
+        const over = total > 0 && booked > total;
+        return (
+          <div key={rt.key} className="ed-hotel-avail-item">
+            <span className="ed-hotel-avail-label">{label}</span>
+            <input
+              type="number"
+              min={0}
+              value={allotment[rt.colIdx] ?? ""}
+              onChange={(e) => updateAllotment(rt.colIdx, Number(e.target.value))}
+              className="ed-hotel-avail-input"
+              placeholder="Quota"
+              title={`Chambres ${rt.label} allouées à ce package`}
+            />
+            {total > 0 && (
+              <span className={`ed-hotel-avail-count ${over ? "over" : ""}`}>{booked}/{total}</span>
+            )}
+          </div>
+        );
+      })}
+      <label className="ed-hotel-avail-block">
+        <input
+          type="checkbox"
+          checked={!!hotel.blockWhenFull}
+          onChange={(e) => onUpdateFields({ blockWhenFull: e.target.checked })}
+        />
+        Bloquer si complet
+      </label>
+    </div>
+  );
+}
+
+function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, onUpdateFields, onRemove, isOnly }) {
   const headers = category.tableHeaders || [];
   const hotels = category.hotels || [];
   const totalNights = hotelCategoryNights(category);
+  const { getBooked } = useHotels();
 
   const updateHeader = (idx, val) => {
     const h = [...headers];
@@ -818,11 +942,18 @@ function HotelCategoryItem({ category, isOpen, onToggle, onUpdate, onRemove, isO
     onUpdate("tableHeaders", h);
   };
 
-  // priceColCount = colonnes après "Hôtel", "Ville", "Nuits", "★" (les 4 premières fixes)
-  const priceColStart = 4;
-
   const updateHotel = (id, field, val) =>
     onUpdate("hotels", hotels.map(h => h.id === id ? { ...h, [field]: val } : h));
+
+  // Picker selection touches name/city/stars together — three sequential
+  // updateHotel() calls would each read the same stale `hotels` closure and
+  // clobber each other, so this merges them in one pass instead. Undefined
+  // keys are dropped (not applied as `undefined`): free-text typing only
+  // sends {name, id: null}, and city/stars must survive that untouched.
+  const updateHotelFields = (id, fields) => {
+    const defined = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+    onUpdate("hotels", hotels.map(h => h.id === id ? { ...h, ...defined } : h));
+  };
 
   const updateHotelCol = (id, colIdx, val) =>
     onUpdate("hotels", hotels.map(h => h.id === id ? { ...h, cols: h.cols.map((c, i) => i === colIdx ? val : c) } : h));
@@ -831,6 +962,7 @@ function HotelCategoryItem({ category, isOpen, onToggle, onUpdate, onRemove, isO
     onUpdate("hotels", [...hotels, {
       id: uid(), name: "Nouvel Hôtel", city: "", stars: 4, nights: 1,
       cols: headers.slice(priceColStart).map(() => "0"),
+      allotment: [], blockWhenFull: false,
     }]);
 
   const removeHotel = (id) =>
@@ -845,15 +977,51 @@ function HotelCategoryItem({ category, isOpen, onToggle, onUpdate, onRemove, isO
     onUpdate("hotels", arr);
   };
 
+  // These two touch tableHeaders and every hotel's cols together — use the
+  // combined updater, not two sequential onUpdate() calls (which would each
+  // read the same stale `headers`/`hotels` closure and clobber each other).
   const addColHeader = () => {
-    onUpdate("tableHeaders", [...headers, "Nouveau"]);
-    onUpdate("hotels", hotels.map(h => ({ ...h, cols: [...h.cols, "0"] })));
+    onUpdateFields({
+      tableHeaders: [...headers, "Nouveau"],
+      hotels: hotels.map(h => ({ ...h, cols: [...h.cols, "0"] })),
+    });
   };
 
   const removeLastCol = () => {
     if (headers.length <= priceColStart + 1) return;
-    onUpdate("tableHeaders", headers.slice(0, -1));
-    onUpdate("hotels", hotels.map(h => ({ ...h, cols: h.cols.slice(0, -1) })));
+    onUpdateFields({
+      tableHeaders: headers.slice(0, -1),
+      hotels: hotels.map(h => ({ ...h, cols: h.cols.slice(0, -1) })),
+    });
+  };
+
+  // Picking a hotel that has its own room types "surcharges" (overrides)
+  // this formule's price columns with that list — every hotel row in the
+  // category shares one set of columns, so all of their cols/allotment get
+  // reset to match, not just the row being edited. The picked row is
+  // prefilled with that hotel's default prices; other rows reset to "0"
+  // since their price under these new columns isn't known. Sequential note
+  // above applies here too: tableHeaders + hotels must land in one update.
+  const applyHotelPick = (hotelRowId, { id, name, city, stars, roomTypes }) => {
+    if (roomTypes?.length) {
+      const newHeaders = roomTypes.map((rt) => rt.type);
+      const pickedCols = roomTypes.map((rt) => String(rt.price ?? 0));
+      const blankCols = roomTypes.map(() => "0");
+      onUpdateFields({
+        tableHeaders: [...headers.slice(0, priceColStart), ...newHeaders],
+        hotels: hotels.map(h =>
+          h.id === hotelRowId
+            ? { ...h, hotelId: id, name, city, stars, cols: pickedCols, allotment: [] }
+            : { ...h, cols: blankCols, allotment: [] }
+        ),
+      });
+      toast.info(
+        `Colonnes de prix mises à jour depuis les types de « ${name} ».` +
+          (hotels.length > 1 ? " Les tarifs des autres hôtels de cette formule ont été réinitialisés." : "")
+      );
+    } else {
+      updateHotelFields(hotelRowId, { hotelId: id, name, city, stars });
+    }
   };
 
   return (
@@ -893,49 +1061,66 @@ function HotelCategoryItem({ category, isOpen, onToggle, onUpdate, onRemove, isO
 
           <div className="ed-section-items-label">Hôtels (ville / nuits)</div>
           {hotels.map((hotel, idx) => (
-            <div key={hotel.id} className="ed-hotel-row" style={{ flexWrap: "wrap" }}>
-              <input
-                value={hotel.name}
-                onChange={e => updateHotel(hotel.id, "name", e.target.value)}
-                className="ed-hotel-name-input"
-                placeholder="Nom de l'hôtel"
-              />
-              <input
-                value={hotel.city || ""}
-                onChange={e => updateHotel(hotel.id, "city", e.target.value)}
-                className="ed-hotel-name-input"
-                placeholder="Ville"
-                style={{ maxWidth: 110 }}
-              />
-              <input
-                value={hotel.nights ?? 1}
-                onChange={e => updateHotel(hotel.id, "nights", Number(e.target.value))}
-                type="number"
-                min={0}
-                className="ed-hotel-stars-input"
-                title="Nombre de nuits"
-                placeholder="Nuits"
-              />
-              <input
-                value={hotel.stars}
-                onChange={e => updateHotel(hotel.id, "stars", Number(e.target.value))}
-                type="number"
-                min={1}
-                max={5}
-                className="ed-hotel-stars-input"
-                title="Étoiles"
-              />
-              {hotel.cols.map((col, ci) => (
-                <input
-                  key={ci}
-                  value={col}
-                  onChange={e => updateHotelCol(hotel.id, ci, e.target.value)}
-                  className="ed-hotel-col-input"
+            <div key={hotel.id}>
+              <div className="ed-hotel-row" style={{ flexWrap: "wrap" }}>
+                <HotelPicker
+                  value={hotel.name}
+                  onSelect={(picked) => applyHotelPick(hotel.id, picked)}
+                  theme="dark"
+                  inputClassName="ed-hotel-name-input"
+                  style={{ flex: 2, minWidth: 100 }}
                 />
-              ))}
-              <button className="ed-section-move-btn" onClick={() => moveHotel(hotel.id, -1)} disabled={idx === 0}>▲</button>
-              <button className="ed-section-move-btn" onClick={() => moveHotel(hotel.id, 1)} disabled={idx === hotels.length - 1}>▼</button>
-              <RemoveBtn onClick={() => removeHotel(hotel.id)} />
+                <input
+                  value={hotel.city || ""}
+                  onChange={e => updateHotel(hotel.id, "city", e.target.value)}
+                  className="ed-hotel-name-input"
+                  placeholder="Ville"
+                  style={{ maxWidth: 110 }}
+                />
+                <input
+                  value={hotel.nights ?? 1}
+                  onChange={e => updateHotel(hotel.id, "nights", Number(e.target.value))}
+                  type="number"
+                  min={0}
+                  className="ed-hotel-stars-input"
+                  title="Nombre de nuits"
+                  placeholder="Nuits"
+                />
+                <input
+                  value={hotel.stars}
+                  onChange={e => updateHotel(hotel.id, "stars", Number(e.target.value))}
+                  type="number"
+                  min={1}
+                  max={5}
+                  className="ed-hotel-stars-input"
+                  title="Étoiles"
+                />
+                {hotel.cols.map((col, ci) => (
+                  <input
+                    key={ci}
+                    value={col}
+                    onChange={e => updateHotelCol(hotel.id, ci, e.target.value)}
+                    className="ed-hotel-col-input"
+                  />
+                ))}
+                <button className="ed-section-move-btn" onClick={() => moveHotel(hotel.id, -1)} disabled={idx === 0}>▲</button>
+                <button className="ed-section-move-btn" onClick={() => moveHotel(hotel.id, 1)} disabled={idx === hotels.length - 1}>▼</button>
+                <RemoveBtn onClick={() => removeHotel(hotel.id)} />
+              </div>
+
+              {hotel.hotelId ? (
+                <HotelAllotmentRow
+                  hotel={hotel}
+                  headers={headers}
+                  packageId={packageId}
+                  getBooked={getBooked}
+                  onUpdateFields={(fields) => updateHotelFields(hotel.id, fields)}
+                />
+              ) : (
+                <div className="ed-hotel-avail-hint">
+                  Choisissez un hôtel dans le catalogue (pas du texte libre) pour activer le suivi de disponibilité.
+                </div>
+              )}
             </div>
           ))}
           <AddBtn label="Ajouter un hôtel" onClick={addHotel} />
@@ -947,12 +1132,21 @@ function HotelCategoryItem({ category, isOpen, onToggle, onUpdate, onRemove, isO
   );
 }
 
-function HotelsEditor({ pkg, update }) {
+function HotelsEditor({ pkg, packageId, update }) {
   const categories = pkg.hotelCategories || [];
   const [openId, setOpenId] = useState(categories[0]?.id ?? null);
+  const { refreshAvailability } = useHotels();
+  useEffect(() => { refreshAvailability(); }, [refreshAvailability]);
 
   const updateCategory = (catId, field, val) =>
     update("hotelCategories", categories.map(c => c.id === catId ? { ...c, [field]: val } : c));
+
+  // Overriding price columns from a picked hotel's room types touches both
+  // tableHeaders and every hotel's cols in one go — two sequential
+  // updateCategory() calls would each read the same stale `categories`
+  // closure and clobber each other.
+  const updateCategoryFields = (catId, fields) =>
+    update("hotelCategories", categories.map(c => c.id === catId ? { ...c, ...fields } : c));
 
   const addCategory = () => {
     const newCat = {
@@ -996,9 +1190,11 @@ function HotelsEditor({ pkg, update }) {
           )}
           <HotelCategoryItem
             category={cat}
+            packageId={packageId}
             isOpen={openId === cat.id}
             onToggle={() => setOpenId(openId === cat.id ? null : cat.id)}
             onUpdate={(field, val) => updateCategory(cat.id, field, val)}
+            onUpdateFields={(fields) => updateCategoryFields(cat.id, fields)}
             onRemove={() => removeCategory(cat.id)}
             isOnly={categories.length <= 1}
           />
@@ -1009,36 +1205,100 @@ function HotelsEditor({ pkg, update }) {
   );
 }
 
+// ─── Dates de départ ────────────────────────────────────────────
+// Stored as year-less "DD/MM" strings — see marketing/dates.js, which owns
+// parsing/formatting so the editor and the public site can't drift apart.
+// Day/month selects make invalid input impossible to type (no free text, no
+// out-of-range day, day auto-clamped when the month shrinks the range).
+const MONTHS_FR = [
+  { value: 1, label: "Jan" }, { value: 2, label: "Fév" }, { value: 3, label: "Mar" },
+  { value: 4, label: "Avr" }, { value: 5, label: "Mai" }, { value: 6, label: "Juin" },
+  { value: 7, label: "Juil" }, { value: 8, label: "Août" }, { value: 9, label: "Sep" },
+  { value: 10, label: "Oct" }, { value: 11, label: "Nov" }, { value: 12, label: "Déc" },
+];
+
+function DateEndpoint({ value, onChange }) {
+  const parsed = parseDDMM(value);
+  const day = parsed?.day ?? "";
+  const month = parsed?.month ?? "";
+
+  // Only emit once both sides are picked — a lone day or month is not a
+  // valid "DD/MM" and would silently vanish from the public site otherwise.
+  const emit = (nextDay, nextMonth) => {
+    if (!nextDay || !nextMonth) { onChange(""); return; }
+    onChange(formatDDMM(Math.min(nextDay, daysInMonth(nextMonth)), nextMonth));
+  };
+
+  return (
+    <div className="ed-date-endpoint">
+      <select
+        value={day}
+        onChange={e => emit(Number(e.target.value) || null, month || null)}
+        className="ed-select ed-date-select ed-date-select-day"
+      >
+        <option value="" disabled>Jour</option>
+        {Array.from({ length: daysInMonth(month || 12) }, (_, i) => i + 1).map(d => (
+          <option key={d} value={d}>{d}</option>
+        ))}
+      </select>
+      <select
+        value={month}
+        onChange={e => emit(day || null, Number(e.target.value) || null)}
+        className="ed-select ed-date-select ed-date-select-month"
+      >
+        <option value="" disabled>Mois</option>
+        {MONTHS_FR.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
 function DatesEditor({ pkg, update }) {
+  const dates = pkg.departureDates || [];
+
   const updateDate = (id, field, val) =>
-    update("departureDates", pkg.departureDates.map(d => d.id === id ? { ...d, [field]: val } : d));
+    update("departureDates", dates.map(d => d.id === id ? { ...d, [field]: val } : d));
 
   const addDate = () =>
-    update("departureDates", [...pkg.departureDates, { id: uid(), from: "JJ/MM", to: "JJ/MM" }]);
+    update("departureDates", [...dates, { id: uid(), from: "", to: "" }]);
 
   const removeDate = (id) =>
-    update("departureDates", pkg.departureDates.filter(d => d.id !== id));
+    update("departureDates", dates.filter(d => d.id !== id));
 
   return (
     <Accordion title="Dates de départ" icon={<Calendar size={14} />}>
-      {pkg.departureDates.map(d => (
-        <div key={d.id} className="ed-date-row">
-          <input
-            value={d.from}
-            onChange={e => updateDate(d.id, "from", e.target.value)}
-            className="ed-date-input"
-            placeholder="Début"
-          />
-          <span className="ed-date-separator">→</span>
-          <input
-            value={d.to}
-            onChange={e => updateDate(d.id, "to", e.target.value)}
-            className="ed-date-input"
-            placeholder="Fin"
-          />
-          <RemoveBtn onClick={() => removeDate(d.id)} />
-        </div>
-      ))}
+      <div className="ed-gallery-hint">
+        Fenêtre de départ, jour/mois sans année (valable chaque année). Les deux
+        dates doivent être renseignées pour que l'entrée apparaisse sur le site.
+      </div>
+      {dates.map(d => {
+        const from = parseDDMM(d.from);
+        const to = parseDDMM(d.to);
+        const incomplete = !from || !to;
+        const reversed = from && to &&
+          (to.month < from.month || (to.month === from.month && to.day < from.day));
+
+        return (
+          <div key={d.id}>
+            <div className={`ed-date-row ${incomplete ? "invalid" : ""}`}>
+              <DateEndpoint value={d.from} onChange={v => updateDate(d.id, "from", v)} />
+              <span className="ed-date-separator">→</span>
+              <DateEndpoint value={d.to} onChange={v => updateDate(d.id, "to", v)} />
+              <RemoveBtn onClick={() => removeDate(d.id)} />
+            </div>
+            {incomplete && (
+              <div className="ed-date-warning error">
+                Date incomplète — n'apparaîtra pas sur le site tant qu'elle n'est pas complète.
+              </div>
+            )}
+            {!incomplete && reversed && (
+              <div className="ed-date-warning info">
+                La fin précède le début : la période chevauche le changement d'année.
+              </div>
+            )}
+          </div>
+        );
+      })}
       <AddBtn label="Ajouter une date" onClick={addDate} />
     </Accordion>
   );
@@ -1071,10 +1331,26 @@ function TabsEditor({ pkg, update }) {
 }
 
 // ─── Gallery Section ────────────────────────────────────────────────
+const EDITOR_PANEL_MIN = 320;
+const EDITOR_PANEL_MAX = 720;
+const EDITOR_PANEL_WIDTH_KEY = "ed-editor-panel-width";
+const EDITOR_PANEL_DEFAULT = 440;
+
 // ─── Main Component ───────────────────────────────────────────────
 export default function PackageEditorPage({ pkg, onSave, onClose }) {
 
   const { updatePackage } = usePackages();
+  const [editorWidth, setEditorWidth] = useState(() => {
+    const stored = Number(localStorage.getItem(EDITOR_PANEL_WIDTH_KEY));
+    return stored >= EDITOR_PANEL_MIN && stored <= EDITOR_PANEL_MAX
+      ? stored
+      : EDITOR_PANEL_DEFAULT;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(EDITOR_PANEL_WIDTH_KEY, String(editorWidth));
+  }, [editorWidth]);
+
   const [packages, setPackages] = useState(() => pkg ? [{
     ...pkg.data,
     id: 1,
@@ -1129,8 +1405,6 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
         <PaletteSidebar pkg={selected} update={update} onClose={onClose} />
       )}
 
-
-
       <div className={`ed-preview-panel ${previewMode ? "fullscreen" : ""}`}>
         {previewMode && (
           <div className="ed-preview-fullscreen-bar">
@@ -1155,7 +1429,16 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
       </div>
 
       {!previewMode && (
-        <div className="ed-editor-panel">
+        <div className="ed-editor-panel" style={{ "--ed-editor-width": `${editorWidth}px` }}>
+          <ResizeHandle
+            width={editorWidth}
+            setWidth={setEditorWidth}
+            min={EDITOR_PANEL_MIN}
+            max={EDITOR_PANEL_MAX}
+            className="ed-editor-resize-handle"
+            dir={-1}
+            label="Redimensionner l'éditeur"
+          />
           <div className="ed-editor-header">
             <span className="ed-editor-title">
               <Settings size={13} />
@@ -1198,7 +1481,7 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
               <GalleryEditor pkg={selected} update={update} />
               <SectionsEditor pkg={selected} update={update} />
               <DaysEditor pkg={selected} update={update} />
-              <HotelsEditor pkg={selected} update={update} />
+              <HotelsEditor pkg={selected} packageId={pkg.$id} update={update} />
               <SupplimentsCard pkg={selected} update={update} />
               <DatesEditor pkg={selected} update={update} />
               <TabsEditor pkg={selected} update={update} />

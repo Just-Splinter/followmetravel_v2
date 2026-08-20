@@ -6,6 +6,7 @@ import { contactFromPackages, officeImages } from "../services/siteContact";
 import Header from "./Header";
 import { Reveal, Lines, Button } from "./ui";
 import GeoMap from "./GeoMap";
+import { usePageMeta } from "./usePageMeta";
 import "./marketing.css";
 
 /* Offices Center B, N° 402 Bd Mohammed V — Casablanca city centre */
@@ -27,6 +28,8 @@ export default function ContactPage() {
   const office = useMemo(() => officeImages(contactFromPackages(packages)), [packages]);
   const subjects = t("subjects");
   const year = new Date().getFullYear();
+
+  usePageMeta(t("footer_contact"), AGENCY_ADDR);
 
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
   const [errors, setErrors] = useState({});

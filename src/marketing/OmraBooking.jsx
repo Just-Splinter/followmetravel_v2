@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 import { useAuth } from "../context/AuthContext";
 import { useReservation } from "../context/ReservationContext";
+import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
 
 /**
@@ -15,6 +16,7 @@ export default function OmraBooking({ pkg, onClose }) {
   const { t, locale } = useLocale();
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const { createReservation } = useReservation();
+  const { trackPayment, trackAbandon } = useEvents();
   const { executeRecaptcha } = useGoogleReCaptcha();
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
   const fmt = (n) => `${nf.format(n)} DH`;
@@ -35,6 +37,18 @@ export default function OmraBooking({ pkg, onClose }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(null);
+
+  // Funnel-abandon: fires once on unmount unless the reservation went through.
+  const doneRef = useRef(false);
+  useEffect(() => { doneRef.current = !!done; }, [done]);
+  useEffect(() => {
+    return () => {
+      if (!doneRef.current) {
+        trackAbandon({ targetId: pkg.$id, label: pkg.title, page: "/omra" });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -79,9 +93,14 @@ export default function OmraBooking({ pkg, onClose }) {
       const d = dates[dateIdx];
       const roomLines = lines.map((l) => ({ type: l.label, qty: l.n }));
       if (children > 0) roomLines.push({ type: t("om_pk_child"), qty: children });
+      const packageTitle = pkg.title || `Omra ${pkg.year || ""}`.trim();
+      // See the matching comment in BookingFlow.jsx's submit(): totalEstimate
+      // (grandTotal) below is client-computed and forwarded as-is to Appwrite
+      // Function '6a312ae3000737bbe2ac' — server-side price validation, if
+      // any, lives entirely in that function's own source, outside this repo.
       const result = await createReservation({
         packageId: pkg.$id,
-        packageTitle: pkg.title || `Omra ${pkg.year || ""}`.trim(),
+        packageTitle,
         category: "Omra",
         hotels: JSON.stringify([
           {
@@ -113,6 +132,11 @@ export default function OmraBooking({ pkg, onClose }) {
         return;
       }
       setDone(result.reservation || {});
+      trackPayment({
+        targetId: pkg.$id,
+        label: packageTitle,
+        data: { totalEstimate: grandTotal, totalPax },
+      });
     } catch (err) {
       setError(err?.message === "AUTH_REQUIRED" ? t("bk_auth_t") : err?.message || t("bk_err"));
     } finally {

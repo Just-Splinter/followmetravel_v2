@@ -1,11 +1,17 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Mail, Search, Plus, Eye, Edit3, Trash2, X, Save,
   Send, Code, FileText, Monitor, Tablet, Smartphone,
   Info, CheckCircle, AlertCircle, Tag,
-  Inbox, Sparkles, Copy as CopyIcon, RefreshCw
+  Inbox, Sparkles, Copy as CopyIcon, RefreshCw,
+  Bold, Italic, Underline, Link2, List, ListOrdered,
+  AlignLeft, AlignCenter, AlignRight, Eraser, Type
 } from "lucide-react";
+import CodeMirror from "@uiw/react-codemirror";
+import { html as htmlLang } from "@codemirror/lang-html";
 import { useMail } from "../context/MailContext";
+import { EMAIL_VARIABLE_GROUPS, EMAIL_VARIABLE_INDEX } from "../services/emailVariables";
+import { sendTestEmail } from "../services/emailSender";
 
 // ─── Global CSS ─────────────────────────────────────────────────────────────
 const EMAIL_CSS = `
@@ -31,6 +37,11 @@ const CATEGORIES = ["Tous", "Onboarding", "Transactionnel", "Marketing", "Relanc
 
 const categoryClass = (cat) => cat.toLowerCase().replace(/\s+/g, "");
 
+// Stable reference: @uiw/react-codemirror recreates the editor state whenever
+// the `extensions` array identity changes, which would reset the cursor/undo
+// history on every render if this were declared inline.
+const HTML_CODE_EXTENSIONS = [htmlLang()];
+
 const emptyTemplate = () => ({
   id: "tpl_" + Math.random().toString(36).slice(2, 9),
   name: "",
@@ -54,12 +65,53 @@ const emptyTemplate = () => ({
 });
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
-function applyVariables(html, variables) {
-  let result = html;
-  variables.forEach(({ key, default: val }) => {
-    result = result.replace(new RegExp(`{{${key}}}`, "g"), val || `[${key}]`);
+
+/**
+ * Inserts `text` at the current caret position of an <input>/<textarea>,
+ * replacing any selection, then restores focus with the caret right after
+ * the inserted text — so clicking a variable chip repeatedly builds up the
+ * field instead of always appending at the end or requiring a manual paste.
+ */
+function insertAtCursor(ref, value, onChange, text) {
+  const el = ref.current;
+  if (!el) { onChange((value || "") + text); return; }
+  const start = el.selectionStart ?? value.length;
+  const end = el.selectionEnd ?? value.length;
+  const next = value.slice(0, start) + text + value.slice(end);
+  onChange(next);
+  requestAnimationFrame(() => {
+    el.focus();
+    const pos = start + text.length;
+    el.setSelectionRange(pos, pos);
   });
-  return result;
+}
+
+/**
+ * Replaces every {{key}} found in `text` — scans the text itself rather than
+ * iterating a declared list, so a variable inserted twice (subject *and*
+ * body, say) or typed by hand still resolves. Precedence: this template's
+ * own override (`variables`) > the catalog's preview value > `[key]` so an
+ * unrecognized variable still reads as a placeholder instead of vanishing.
+ */
+function applyVariables(text, variables) {
+  const overrides = new Map((variables || []).map((v) => [v.key, v.default]));
+  return String(text || "").replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    const override = overrides.get(key);
+    if (override) return override;
+    const catalogPreview = EMAIL_VARIABLE_INDEX[key]?.preview;
+    return catalogPreview || `[${key}]`;
+  });
+}
+
+/** Distinct {{key}} names found across one or more text fields, in first-seen order. */
+function extractVariableKeys(...texts) {
+  const seen = new Set();
+  const re = /\{\{(\w+)\}\}/g;
+  texts.forEach((text) => {
+    let m;
+    while ((m = re.exec(String(text || "")))) seen.add(m[1]);
+  });
+  return [...seen];
 }
 
 function cloneTemplate(tpl) {
@@ -72,6 +124,100 @@ function cloneTemplate(tpl) {
     variables: tpl.variables.map((v) => ({ ...v })),
     tags: [...tpl.tags],
   };
+}
+
+/**
+ * WYSIWYG mode for the HTML field — a contentEditable surface with a
+ * formatting toolbar, for admins who'd rather not hand-write markup. Kept
+ * deliberately uncontrolled: `initialHtml` only seeds the DOM once on mount
+ * (this component is remounted, via the `key="rich"` on its call site,
+ * whenever the admin switches back into this tab, which is what picks up
+ * edits made meanwhile in the Code tab). If React re-set innerHTML from
+ * state on every keystroke instead, the caret would jump on every render.
+ */
+function RichHtmlEditor({ editorRef, initialHtml, onChange, onFocus }) {
+  useEffect(() => {
+    if (editorRef.current) editorRef.current.innerHTML = initialHtml || "";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const exec = (cmd, arg) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, arg);
+    onChange(editorRef.current?.innerHTML || "");
+  };
+
+  const insertLink = () => {
+    const url = window.prompt("URL du lien :", "https://");
+    if (!url) return;
+    exec("createLink", url);
+  };
+
+  const toolBtn = (cmd, arg, Icon, label) => (
+    <button
+      type="button"
+      className="em-rich-tool"
+      title={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => exec(cmd, arg)}
+    >
+      <Icon size={14} />
+    </button>
+  );
+
+  const headingBtn = (tag, label) => (
+    <button
+      key={tag}
+      type="button"
+      className="em-rich-tool text"
+      title={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => exec("formatBlock", tag)}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="em-rich-editor-wrap">
+      <div className="em-rich-toolbar">
+        {headingBtn("<p>", "P")}
+        {headingBtn("<h1>", "H1")}
+        {headingBtn("<h2>", "H2")}
+        {headingBtn("<h3>", "H3")}
+        <span className="em-rich-sep" />
+        {toolBtn("bold", null, Bold, "Gras")}
+        {toolBtn("italic", null, Italic, "Italique")}
+        {toolBtn("underline", null, Underline, "Souligné")}
+        <span className="em-rich-sep" />
+        <button
+          type="button"
+          className="em-rich-tool"
+          title="Lien"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={insertLink}
+        >
+          <Link2 size={14} />
+        </button>
+        {toolBtn("insertUnorderedList", null, List, "Liste à puces")}
+        {toolBtn("insertOrderedList", null, ListOrdered, "Liste numérotée")}
+        <span className="em-rich-sep" />
+        {toolBtn("justifyLeft", null, AlignLeft, "Aligner à gauche")}
+        {toolBtn("justifyCenter", null, AlignCenter, "Centrer")}
+        {toolBtn("justifyRight", null, AlignRight, "Aligner à droite")}
+        <span className="em-rich-sep" />
+        {toolBtn("removeFormat", null, Eraser, "Effacer la mise en forme")}
+      </div>
+      <div
+        ref={editorRef}
+        className="em-rich-editor"
+        contentEditable
+        suppressContentEditableWarning
+        onInput={(e) => onChange(e.currentTarget.innerHTML)}
+        onFocus={onFocus}
+      />
+    </div>
+  );
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
@@ -253,36 +399,107 @@ function PreviewModal({ tpl, onClose, onEdit }) {
 }
 
 // ─── Editor Modal ───────────────────────────────────────────────────────────
-function EditorModal({ tpl: initialTpl, onClose, onSave, loading }) {
+function EditorModal({ tpl: initialTpl, onClose, onSave, loading, showToast }) {
   const [tpl, setTpl] = useState(() => ({
     ...initialTpl,
     variables: initialTpl.variables.map((v) => ({ ...v })),
     tags: [...initialTpl.tags],
   }));
   const [tab, setTab] = useState("content");
-  const [htmlTab, setHtmlTab] = useState("edit");
+  // "rich" = WYSIWYG contentEditable (the easy path for non-technical admins),
+  // "code" = raw HTML in CodeMirror, "split" = code + live preview side by side.
+  const [htmlTab, setHtmlTab] = useState("rich");
+  const [customVarKey, setCustomVarKey] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testSending, setTestSending] = useState(false);
+
+  // Which field a variable chip inserts into — whichever of subject/
+  // preheader/html the admin last focused, defaulting to the HTML body.
+  const [activeField, setActiveField] = useState("html");
+  const subjectRef = useRef(null);
+  const preheaderRef = useRef(null);
+  // Holds the CodeMirror EditorView instance (not a DOM node — the HTML
+  // field is a real code editor now, which has its own selection API).
+  const htmlViewRef = useRef(null);
+  // Holds the contentEditable DOM node for the WYSIWYG "rich" mode.
+  const richEditorRef = useRef(null);
+  const fieldRefs = { subject: subjectRef, preheader: preheaderRef };
 
   const set = (field, value) => setTpl((t) => ({ ...t, [field]: value }));
 
-  const setVar = (idx, v) =>
+  // Inserting is the only way variables get into a template now — a chip is
+  // never "used up", so the same {{key}} can go into the subject and the
+  // body (or twice in the body) just by clicking it again in each field.
+  const insertVariable = (key) => {
+    const text = `{{${key}}}`;
+    if (activeField === "html" && htmlTab === "rich") {
+      const el = richEditorRef.current;
+      if (!el) { set("html", (tpl.html || "") + text); return; }
+      el.focus();
+      document.execCommand("insertText", false, text);
+      set("html", el.innerHTML);
+      return;
+    }
+    if (activeField === "html") {
+      const view = htmlViewRef.current;
+      if (!view) { set("html", (tpl.html || "") + text); return; }
+      const { from, to } = view.state.selection.main;
+      view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length } });
+      view.focus();
+      return;
+    }
+    insertAtCursor(fieldRefs[activeField], tpl[activeField] || "", (v) => set(activeField, v), text);
+  };
+
+  const insertCustomVariable = () => {
+    const key = customVarKey.trim().replace(/\s+/g, "_");
+    if (!key) return;
+    insertVariable(key);
+    setCustomVarKey("");
+  };
+
+  // Which {{key}}s actually appear in this template right now — the
+  // Variables tab lists these, not a manually-curated array. Removing a
+  // variable means deleting its {{...}} from the content, not "un-adding"
+  // it from a list.
+  const usedKeys = useMemo(
+    () => extractVariableKeys(tpl.subject, tpl.preheader, tpl.html),
+    [tpl.subject, tpl.preheader, tpl.html]
+  );
+
+  /** Preview override for one variable — falls back to the catalog's preview value. */
+  const varDefault = (key) => tpl.variables.find((v) => v.key === key)?.default ?? EMAIL_VARIABLE_INDEX[key]?.preview ?? "";
+
+  const setVarDefault = (key, val) =>
     setTpl((t) => {
-      const vars = [...t.variables];
-      vars[idx] = v;
-      return { ...t, variables: vars };
+      const exists = t.variables.some((v) => v.key === key);
+      return {
+        ...t,
+        variables: exists
+          ? t.variables.map((v) => (v.key === key ? { ...v, default: val } : v))
+          : [...t.variables, { key, default: val }],
+      };
     });
 
-  const removeVar = (idx) =>
-    setTpl((t) => ({ ...t, variables: t.variables.filter((_, i) => i !== idx) }));
-
-  const addVar = () =>
-    setTpl((t) => ({ ...t, variables: [...t.variables, { key: "nouvelle_variable", default: "" }] }));
-
   const rendered = applyVariables(tpl.html, tpl.variables);
+
+  const handleSendTest = async () => {
+    if (!testEmail.trim()) return;
+    setTestSending(true);
+    try {
+      await sendTestEmail(tpl.$id, testEmail.trim());
+      showToast?.(`Test envoyé à ${testEmail.trim()}`);
+    } catch (err) {
+      showToast?.(err?.message || "Échec de l'envoi du test", "error");
+    } finally {
+      setTestSending(false);
+    }
+  };
 
   const tabs = [
     { id: "content", label: "Contenu & Objet", icon: FileText },
     { id: "reply", label: "Informations d'envoi", icon: Send },
-    { id: "variables", label: `Variables (${tpl.variables.length})`, icon: Code },
+    { id: "variables", label: `Variables (${usedKeys.length})`, icon: Code },
     { id: "preview", label: "Aperçu", icon: Eye },
   ];
 
@@ -344,97 +561,156 @@ function EditorModal({ tpl: initialTpl, onClose, onSave, loading }) {
         <div className="em-modal-body">
           {/* Tab: Content */}
           {tab === "content" && (
-            <div style={{ animation: "emFadeIn 0.3s ease" }}>
-              <div className="em-field-row">
-                <div className="em-field">
-                  <label className="em-field-label">
-                    Objet de l'email
-                    <span className="em-field-hint">Supporte les variables {"{{...}}"}</span>
-                  </label>
-                  <input
-                    className="em-input"
-                    value={tpl.subject}
-                    onChange={(e) => set("subject", e.target.value)}
-                    placeholder="Objet de votre email..."
-                  />
-                </div>
-                <div className="em-field">
-                  <label className="em-field-label">
-                    Préheader
-                    <span className="em-field-hint">Texte affiché après l'objet</span>
-                  </label>
-                  <input
-                    className="em-input"
-                    value={tpl.preheader}
-                    onChange={(e) => set("preheader", e.target.value)}
-                    placeholder="Courte description..."
-                  />
-                </div>
-              </div>
-
-              <div className="em-field">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <label className="em-field-label" style={{ margin: 0 }}>HTML du template</label>
-                  <div className="em-html-tabs">
-                    <button className={`em-html-tab ${htmlTab === "edit" ? "active" : ""}`} onClick={() => setHtmlTab("edit")}>
-                      Éditeur
-                    </button>
-                    <button className={`em-html-tab ${htmlTab === "split" ? "active" : ""}`} onClick={() => setHtmlTab("split")}>
-                      Split view
-                    </button>
+            <div className="em-var-tab-layout" style={{ animation: "emFadeIn 0.3s ease" }}>
+              <div className="em-var-tab-main">
+                <div className="em-field-row">
+                  <div className="em-field">
+                    <label className="em-field-label">
+                      Objet de l'email
+                      <span className="em-field-hint">Supporte les variables {"{{...}}"}</span>
+                    </label>
+                    <input
+                      ref={subjectRef}
+                      className="em-input"
+                      value={tpl.subject}
+                      onChange={(e) => set("subject", e.target.value)}
+                      onFocus={() => setActiveField("subject")}
+                      placeholder="Objet de votre email..."
+                    />
+                  </div>
+                  <div className="em-field">
+                    <label className="em-field-label">
+                      Préheader
+                      <span className="em-field-hint">Texte affiché après l'objet</span>
+                    </label>
+                    <input
+                      ref={preheaderRef}
+                      className="em-input"
+                      value={tpl.preheader}
+                      onChange={(e) => set("preheader", e.target.value)}
+                      onFocus={() => setActiveField("preheader")}
+                      placeholder="Courte description..."
+                    />
                   </div>
                 </div>
 
-                {htmlTab === "edit" ? (
-                  <textarea
-                    className="em-textarea"
-                    value={tpl.html}
-                    onChange={(e) => set("html", e.target.value)}
-                    style={{ height: 400 }}
-                  />
-                ) : (
-                  <div className="em-split-view">
-                    <textarea
-                      className="em-textarea"
-                      value={tpl.html}
-                      onChange={(e) => set("html", e.target.value)}
-                      style={{ height: 440, resize: "none" }}
-                    />
-                    <div className="em-split-preview">
-                      <div className="em-split-preview-header">
-                        <span className="live-dot" />
-                        Aperçu en direct
-                      </div>
-                      <iframe
-                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="margin:0;padding:0;">${rendered}</body></html>`}
-                        style={{ width: "100%", height: 410, border: "none", display: "block" }}
-                        title="Live preview"
-                      />
+                <div className="em-field">
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <label className="em-field-label" style={{ margin: 0 }}>HTML du template</label>
+                    <div className="em-html-tabs">
+                      <button className={`em-html-tab ${htmlTab === "rich" ? "active" : ""}`} onClick={() => setHtmlTab("rich")}>
+                        <Type size={12} /> Texte
+                      </button>
+                      <button className={`em-html-tab ${htmlTab === "code" ? "active" : ""}`} onClick={() => setHtmlTab("code")}>
+                        <Code size={12} /> Code
+                      </button>
+                      <button className={`em-html-tab ${htmlTab === "split" ? "active" : ""}`} onClick={() => setHtmlTab("split")}>
+                        Split view
+                      </button>
                     </div>
                   </div>
-                )}
 
-                <div className="em-var-palette">
-                  <p className="em-var-palette-label">
-                    <Sparkles size={12} />
-                    Cliquez pour copier une variable :
-                  </p>
-                  <div className="em-var-chips">
-                    {tpl.variables.map(({ key }) => (
-                      <button
-                        key={key}
-                        className="em-var-chip"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(`{{${key}}}`);
-                        }}
-                        title="Copier dans le presse-papiers"
-                      >
-                        {`{{${key}}}`}
-                      </button>
-                    ))}
-                  </div>
+                  {htmlTab === "rich" ? (
+                    <RichHtmlEditor
+                      key="rich"
+                      editorRef={richEditorRef}
+                      initialHtml={tpl.html}
+                      onChange={(value) => set("html", value)}
+                      onFocus={() => setActiveField("html")}
+                    />
+                  ) : htmlTab === "code" ? (
+                    <div className="em-code-editor" onFocus={() => setActiveField("html")}>
+                      <CodeMirror
+                        value={tpl.html}
+                        height="400px"
+                        extensions={HTML_CODE_EXTENSIONS}
+                        onChange={(value) => set("html", value)}
+                        onCreateEditor={(view) => { htmlViewRef.current = view; }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="em-split-view">
+                      <div className="em-code-editor" onFocus={() => setActiveField("html")}>
+                        <CodeMirror
+                          value={tpl.html}
+                          height="440px"
+                          extensions={HTML_CODE_EXTENSIONS}
+                          onChange={(value) => set("html", value)}
+                          onCreateEditor={(view) => { htmlViewRef.current = view; }}
+                        />
+                      </div>
+                      <div className="em-split-preview">
+                        <div className="em-split-preview-header">
+                          <span className="live-dot" />
+                          Aperçu en direct
+                        </div>
+                        <iframe
+                          srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="margin:0;padding:0;">${rendered}</body></html>`}
+                          style={{ width: "100%", height: 410, border: "none", display: "block" }}
+                          title="Live preview"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              <aside className="em-var-tab-sidebar">
+                <div className="em-var-catalog">
+                  <p className="em-var-catalog-title">
+                    <Sparkles size={12} style={{ verticalAlign: -1, marginInlineEnd: 4 }} />
+                    Insérer dans {activeField === "subject" ? "l'objet" : activeField === "preheader" ? "le préheader" : "le HTML"}
+                  </p>
+                  <p className="em-var-palette-empty" style={{ margin: "-6px 0 4px" }}>
+                    Une variable peut être insérée plusieurs fois, dans plusieurs champs.
+                  </p>
+
+                  <div className="em-var-catalog-scroll">
+                    {EMAIL_VARIABLE_GROUPS.map((group) => (
+                      <div key={group.label} className="em-var-catalog-group">
+                        <p className="em-var-catalog-group-label">{group.label}</p>
+                        <div className="em-var-chips">
+                          {group.variables.map((v) => (
+                            <button
+                              key={v.key}
+                              type="button"
+                              className="em-var-chip catalog"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => insertVariable(v.key)}
+                              title={v.description}
+                            >
+                              {`{{${v.key}}}`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="em-var-catalog-group">
+                      <p className="em-var-catalog-group-label">Variable personnalisée</p>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          className="em-var-input mono"
+                          style={{ fontSize: 12 }}
+                          value={customVarKey}
+                          onChange={(e) => setCustomVarKey(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); insertCustomVariable(); } }}
+                          placeholder="nom_variable"
+                        />
+                        <button
+                          type="button"
+                          className="em-action-btn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={insertCustomVariable}
+                          title="Insérer"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
             </div>
           )}
 
@@ -502,39 +778,44 @@ function EditorModal({ tpl: initialTpl, onClose, onSave, loading }) {
               <div className="em-info-box green">
                 <Code size={16} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>
-                  Les variables s'utilisent dans l'objet et le HTML avec la syntaxe <code>{"{{nom_variable}}"}</code>
+                  Cette liste se construit automatiquement à partir des <code>{"{{variables}}"}</code> présentes
+                  dans l'objet, le pré-en-tête et le contenu HTML (onglet <strong>Contenu</strong>, où se trouve
+                  le catalogue à insérer). Une variable peut être utilisée plusieurs fois — définissez ici la
+                  valeur d'exemple utilisée pour l'aperçu.
                 </span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, padding: "0 8px 10px" }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" }}>Nom de la variable</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" }}>Valeur d'exemple</span>
-                <span />
-              </div>
+              {usedKeys.length === 0 ? (
+                <p className="em-var-catalog-title" style={{ marginTop: 18 }}>
+                  Aucune variable dans ce template. Passez à l'onglet Contenu et cliquez sur une variable du
+                  catalogue pour l'insérer.
+                </p>
+              ) : (
+                <>
+                  <p className="em-var-catalog-title" style={{ marginTop: 18 }}>
+                    Variables utilisées ({usedKeys.length})
+                  </p>
 
-              {tpl.variables.map((v, i) => (
-                <div key={i} className="em-var-row">
-                  <input
-                    className="em-var-input mono"
-                    value={v.key}
-                    onChange={(e) => setVar(i, { ...v, key: e.target.value.replace(/\s/g, "_") })}
-                    placeholder="nom_variable"
-                  />
-                  <input
-                    className="em-var-input"
-                    value={v.default}
-                    onChange={(e) => setVar(i, { ...v, default: e.target.value })}
-                    placeholder="Valeur exemple"
-                  />
-                  <button className="em-var-remove" onClick={() => removeVar(i)}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 8px 10px" }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" }}>Nom de la variable</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" }}>Valeur d'exemple</span>
+                  </div>
 
-              <button className="em-action-btn" onClick={addVar} style={{ marginTop: 8, alignSelf: "flex-start" }}>
-                <Plus size={14} /> Ajouter une variable
-              </button>
+                  {usedKeys.map((key) => (
+                    <div key={key} className="em-var-row" title={EMAIL_VARIABLE_INDEX[key]?.description}>
+                      <span className="em-var-input mono" style={{ display: "flex", alignItems: "center" }}>
+                        {`{{${key}}}`}
+                      </span>
+                      <input
+                        className="em-var-input"
+                        value={varDefault(key)}
+                        onChange={(e) => setVarDefault(key, e.target.value)}
+                        placeholder="Valeur exemple"
+                      />
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
@@ -561,6 +842,33 @@ function EditorModal({ tpl: initialTpl, onClose, onSave, loading }) {
                   <span className="em-email-subject">{applyVariables(tpl.subject, tpl.variables)}</span>
                 </div>
               </div>
+
+              <div className="em-info-box" style={{ marginBottom: 18, alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <Send size={16} style={{ flexShrink: 0 }} />
+                {tpl.$id ? (
+                  <>
+                    <span style={{ flexShrink: 0 }}>Envoyer un test à :</span>
+                    <input
+                      className="em-input"
+                      type="email"
+                      style={{ maxWidth: 240 }}
+                      placeholder="vous@followmetravel.ma"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                    />
+                    <button
+                      className="em-action-btn"
+                      onClick={handleSendTest}
+                      disabled={testSending || !testEmail.trim()}
+                    >
+                      {testSending ? "Envoi…" : "Envoyer le test"}
+                    </button>
+                  </>
+                ) : (
+                  <span>Enregistrez ce template pour pouvoir envoyer un test.</span>
+                )}
+              </div>
+
               <iframe
                 srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="margin:0;padding:0;">${rendered}</body></html>`}
                 style={{ width: "100%", minHeight: 480, border: "1px solid #e2e8f0", borderRadius: 10, display: "block" }}
@@ -870,6 +1178,7 @@ export default function EmailManager() {
           onClose={() => setEditing(null)}
           onSave={handleSave}
           loading={saving}
+          showToast={showToast}
         />
       )}
       {deleting && (

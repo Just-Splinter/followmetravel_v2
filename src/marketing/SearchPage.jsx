@@ -8,11 +8,12 @@ import { localizeData } from "../services/translate";
 import { useLocale } from "./i18n";
 import Header from "./Header";
 import { Footer } from "./Sections";
-import { Arrow } from "./ui";
+import { Arrow, FavoriteButton } from "./ui";
 import QuickPrice from "./QuickPrice";
 import GeoMap from "./GeoMap";
 import { resolvePlace } from "./geo";
 import { useClickOutside } from "../components/ClickOutSide";
+import { usePageMeta } from "./usePageMeta";
 import "./marketing.css";
 
 /* ─── Small icons ────────────────────────────────────────────────────────── */
@@ -55,6 +56,8 @@ export default function SearchPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
+
+  usePageMeta(t("search_title"), t("footer_tag"));
 
   /* items */
   const items = useMemo(
@@ -330,6 +333,7 @@ export default function SearchPage() {
     <article className="mk-sr-card">
       <figure onClick={() => go(it.id)}>
         {it.img ? <img src={it.img} alt={it.title} loading="lazy" /> : <span className="mk-sr-imgfall">{it.title.charAt(0)}</span>}
+        <FavoriteButton id={it.id} label={it.title} />
       </figure>
       <div className="mk-sr-card-body">
         <div className="mk-sr-card-head">
@@ -360,6 +364,7 @@ export default function SearchPage() {
       <figure>
         {it.img ? <img src={it.img} alt={it.title} loading="lazy" /> : <span className="mk-sr-imgfall">{it.title.charAt(0)}</span>}
         {it.featured && <span className="mk-sr-chip mk-sr-chip--accent">{t("sr_featured")}</span>}
+        <FavoriteButton id={it.id} label={it.title} />
       </figure>
       <div className="mk-sr-gcard-meta">
         <span>{it.country}</span>

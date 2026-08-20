@@ -1,34 +1,45 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { lazy, useEffect } from "react";
 import '../styles/variables.css'
 
-import { AuthProvider } from "../context/AuthContext";
-import LoginPage from "../pages/LoginPage";
-import Layout from "../components/Layout.jsx";
-import PackagesManager from "../pages/PackagesPage.jsx";
+import { AuthProvider, useAuth } from "../context/AuthContext";
+import { FavoritesProvider } from "../context/FavoritesContext.jsx";
+import { HotelsProvider } from "../context/HotelsContext.jsx";
 import { PackageProvider } from "../context/PackagesContext.jsx";
-import { getUserData } from "../services/appwrite.js";
-import { useEffect, useState } from "react";
-import PackagePage from "../marketing/PackagePage.jsx";
 import { PackageViewerProvider } from "../context/PackageViewerContext.jsx";
 import { ReservationProvider } from "../context/ReservationContext.jsx";
-import TravelCMS from "../pages/TravelCMS.jsx";
+import { ClientsProvider } from "../context/ClientsContext.jsx";
 import { TravelDataProvider } from "../context/TravelDataContext.jsx";
+import { MailProvider } from "../context/MailContext.jsx";
 import { LocaleProvider } from "../marketing/i18n.jsx";
+import { useEvents } from "../context/EventsContext.jsx";
+
+import Layout from "../components/Layout.jsx";
+import LoginPage from "../pages/LoginPage";
+import AuthError from "../communs/AuthError.jsx";
+import AuthCallback from "../communs/AuthCallback.jsx";
+import AuthRecovery from "../communs/AuthRecovery.jsx";
+import { ToastContainer, toast } from 'react-toastify';
+
+// Public marketing pages are the first paint — keep them in the entry chunk.
 import LandingPage from "../marketing/LandingPage.jsx";
 import MarketingContactPage from "../marketing/ContactPage.jsx";
 import SearchPage from "../marketing/SearchPage.jsx";
 import OmraPage from "../marketing/OmraPage.jsx";
-import ReservationsManager from "../components/ReservationsManager.jsx";
-import AuthError from "../communs/AuthError.jsx";
-import AuthCallback from "../communs/AuthCallback.jsx";
-import AnalyticsDashboard from "../pages/Analyticsdashboard.jsx";
-import { useEvents } from "../context/EventsContext.jsx";
+import PackagePage from "../marketing/PackagePage.jsx";
 import ProfilePage from "../marketing/ProfilePage.jsx";
-import { ToastContainer } from 'react-toastify';
-import MetaAds from "../components/MetaAds.jsx";
-import EmailManager from "../pages/Emailmanager.jsx";
-import { MailProvider } from "../context/MailContext.jsx";
-import HotelManager from "../pages/Hotelsmanager.jsx";
+import LegalPage from "../marketing/LegalPage.jsx";
+
+// The back-office is never seen by a visitor, so it must not ship to one.
+// recharts alone (AnalyticsDashboard) is a few hundred kB.
+const AnalyticsDashboard = lazy(() => import("../pages/Analyticsdashboard.jsx"));
+const PackagesManager    = lazy(() => import("../pages/PackagesPage.jsx"));
+const TravelCMS          = lazy(() => import("../pages/TravelCMS.jsx"));
+const ReservationsManager = lazy(() => import("../components/ReservationsManager.jsx"));
+const ClientsManager     = lazy(() => import("../components/ClientsManager.jsx"));
+const MetaAds            = lazy(() => import("../components/MetaAds.jsx"));
+const EmailManager       = lazy(() => import("../pages/Emailmanager.jsx"));
+const HotelManager       = lazy(() => import("../pages/Hotelsmanager.jsx"));
 
 const EXCLUDED_ROUTES = [
   "/dashboard",
@@ -61,184 +72,165 @@ function AnalyticsTracker() {
 
   return null;
 }
+
+/**
+ * Session gate. Reads AuthContext rather than calling account.get() again —
+ * this component used to fire its own duplicate request on every mount.
+ *
+ * This is a UX guard, not a security boundary: it only stops the dashboard
+ * UI from rendering for a logged-in-but-non-admin visitor. Anyone can still
+ * call the Appwrite API directly from a browser console — the actual
+ * enforcement has to live in Appwrite's collection/document permissions
+ * (Role.label("admin")), which this component cannot see or affect.
+ */
 function ProtectedRoute({ children }) {
-  const [user, setUser] = useState(undefined);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAuth();
   const { setUserId } = useEvents();
+  const isAdmin = !!user?.labels?.includes("admin");
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const account = await getUserData();
-        setUser(account);
-        setUserId(account.email);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (user?.email) setUserId(user.email);
+  }, [user, setUserId]);
 
-    loadUser();
-  }, [setUserId]);
+  useEffect(() => {
+    if (user && !isAdmin) toast.error("Accès réservé aux administrateurs.");
+  }, [user, isAdmin]);
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <div className="app-booting">Chargement…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
 
-  return user ? children : <Navigate to="/login" replace />;
+  return children;
 }
-const TravelLayout = ({ children }) => (
-  <TravelDataProvider>
-    <ReservationProvider>
-      {children}
-    </ReservationProvider>
-  </TravelDataProvider>
-);
 
-const PackageLayout = ({ children }) => (
-  <PackageProvider>
-    {children}
-  </PackageProvider>
-);
+/**
+ * Pathless layout route for the public site.
+ *
+ * This has to be a layout route, not a wrapper repeated in every `element`:
+ * a per-route wrapper gives each page its *own* TravelDataProvider, so
+ * navigating / → /omra → /search remounted the provider and re-ran the six
+ * bootstrap collection fetches every single time. As a layout route the
+ * providers mount once and survive navigation between their children.
+ */
+function PublicShell() {
+  return (
+    <TravelDataProvider>
+      <ReservationProvider>
+        <Outlet />
+      </ReservationProvider>
+    </TravelDataProvider>
+  );
+}
 
-const ReservationLayout = ({ children }) => (
-  <PackageProvider>
-    <ReservationProvider>
-      {children}
-    </ReservationProvider>
-  </PackageProvider>
-);
-
-const PackageViewerLayout = ({ children }) => (
-  <PackageViewerProvider>
-    {children}
-  </PackageViewerProvider>
-);
+/**
+ * Nested layout route for the two back-office pages that need the CMS data
+ * layer: TravelCMS directly, and PackagesManager through CreatePackageModal.
+ *
+ * Deliberately *not* hoisted onto /dashboard itself — TravelDataProvider
+ * bootstraps six collection fetches on mount, and the analytics, hotels, ads
+ * and mail pages never read any of it.
+ */
+function CmsShell() {
+  return (
+    <TravelDataProvider>
+      <PackageProvider>
+        <Outlet />
+      </PackageProvider>
+    </TravelDataProvider>
+  );
+}
 
 export default function Starter() {
   return (
     <AuthProvider>
-      <ToastContainer></ToastContainer>
+      <FavoritesProvider>
+      <ToastContainer />
       <BrowserRouter>
         <LocaleProvider>
-        <ScrollReset />
-        <AnalyticsTracker></AnalyticsTracker>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/auth/error" element={<AuthError />} />
-          <Route
-            path="/packages/view"
-            element={
-              <PackageViewerLayout>
-                <PackagePage />
-              </PackageViewerLayout>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <TravelLayout>
-                <LandingPage />
-              </TravelLayout>
-            }
-          />
-          <Route
-            path="/contact"
-            element={
-              <TravelLayout>
-                <MarketingContactPage />
-              </TravelLayout>
-            }
-          />
-          <Route
-            path="/omra"
-            element={
-              <TravelLayout>
-                <OmraPage />
-              </TravelLayout>
-            }
-          />
-          <Route
-            path="/search"
-            element={
-              <TravelLayout>
-                <SearchPage />
-              </TravelLayout>
-            }
-          />
-           <Route
-            path="/profil"
-            element={
-              <TravelLayout>
-                <ProfilePage />
-              </TravelLayout>
-            }
-          />
-          {/* Protected layout */}
-          <Route path="/dashboard" element={<Layout />}>
+          <ScrollReset />
+          <AnalyticsTracker />
+          <Routes>
+            {/* ── Public ─────────────────────────────────────────────── */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/error" element={<AuthError />} />
+            <Route path="/auth/recovery" element={<AuthRecovery />} />
+
             <Route
-              path="home"
+              path="/packages/view"
               element={
-                <AnalyticsDashboard></AnalyticsDashboard>
-              }
-            />
-             <Route
-              path="hotel"
-              element={
-                <HotelManager></HotelManager>
-              }
-            />
-            <Route
-              path="ads"
-              element={
-                <MetaAds></MetaAds>
+                <PackageViewerProvider>
+                  <PackagePage />
+                </PackageViewerProvider>
               }
             />
 
+            <Route element={<PublicShell />}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/contact" element={<MarketingContactPage />} />
+              <Route path="/omra" element={<OmraPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/profil" element={<ProfilePage />} />
+              <Route path="/legal/:slug" element={<LegalPage />} />
+            </Route>
+
+            {/* ── Back-office (authenticated) ─────────────────────────
+                The guard belongs here, on the parent. It used to sit on two
+                children only, which left /dashboard/home, /hotel, /ads, /mail
+                and /settings — the CMS — reachable without a session. */}
             <Route
-              path="mail"
-              element={
-                <MailProvider>
-                  <EmailManager></EmailManager>
-                </MailProvider>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <TravelLayout>
-                  <TravelCMS />
-                </TravelLayout>
-              }
-            />
-            <Route
-              path="reservations"
+              path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <ReservationLayout>
-                    <ReservationsManager />
-                  </ReservationLayout>
+                  <HotelsProvider>
+                    <Layout />
+                  </HotelsProvider>
                 </ProtectedRoute>
               }
-            />
-            <Route
-              path="packages"
-              element={
-                <ProtectedRoute>
-                  <PackageLayout>
-                    <PackagesManager />
-                  </PackageLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
-          </Route>
-        </Routes>
+            >
+              <Route path="home" element={<AnalyticsDashboard />} />
+              <Route path="hotel" element={<HotelManager />} />
+              <Route path="ads" element={<MetaAds />} />
+              <Route
+                path="mail"
+                element={
+                  <MailProvider>
+                    <EmailManager />
+                  </MailProvider>
+                }
+              />
+              <Route
+                path="reservations"
+                element={
+                  <ReservationProvider>
+                    <ClientsProvider>
+                      <ReservationsManager />
+                    </ClientsProvider>
+                  </ReservationProvider>
+                }
+              />
+              <Route
+                path="clients"
+                element={
+                  <ReservationProvider>
+                    <ClientsProvider>
+                      <ClientsManager />
+                    </ClientsProvider>
+                  </ReservationProvider>
+                }
+              />
+
+              <Route element={<CmsShell />}>
+                <Route path="settings" element={<TravelCMS />} />
+                <Route path="packages" element={<PackagesManager />} />
+              </Route>
+
+              <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
+            </Route>
+          </Routes>
         </LocaleProvider>
       </BrowserRouter>
+      </FavoritesProvider>
     </AuthProvider>
   );
 }

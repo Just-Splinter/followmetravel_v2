@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
+import { RECAPTCHA_SITE_KEY } from "../services/recaptcha";
 import { useTravelData } from "../context/TravelDataContext";
+import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
 import { omraFromPackages, omraYear } from "../services/omra";
 import Header from "./Header";
 import { Footer } from "./Sections";
 import { Reveal } from "./ui";
 import OmraBooking from "./OmraBooking";
+import { usePageMeta } from "./usePageMeta";
 import "./marketing.css";
 import "./omra.css";
 
@@ -156,7 +160,15 @@ export default function OmraPage() {
   const { t, locale } = useLocale();
   const { packages } = useTravelData();
   const navigate = useNavigate();
+  const { trackReserve } = useEvents();
   const [booking, setBooking] = useState(null); // omra pkg being booked
+
+  usePageMeta("Omra", t("footer_tag"));
+
+  const openBooking = (o) => {
+    trackReserve({ targetId: o.$id ?? o.id, label: o.title, page: "/omra" });
+    setBooking(o);
+  };
 
   // starfield depth — two layers drift gently with the cursor
   const heroRef = useRef(null);
@@ -432,7 +444,7 @@ export default function OmraPage() {
                         </div>
                       )}
                       <p className="om-price-note">{t("om_pk_note")}</p>
-                      <button className="om-book-btn" onClick={() => setBooking(o)}>
+                      <button className="om-book-btn" onClick={() => openBooking(o)}>
                         {t("om_pk_book")}
                       </button>
                     </aside>
@@ -482,7 +494,9 @@ export default function OmraPage() {
       <Footer />
 
       {booking && (
-        <OmraBooking pkg={booking} onClose={() => setBooking(null)} />
+        <GoogleReCaptchaProvider reCaptchaKey={RECAPTCHA_SITE_KEY}>
+          <OmraBooking pkg={booking} onClose={() => setBooking(null)} />
+        </GoogleReCaptchaProvider>
       )}
     </div>
   );

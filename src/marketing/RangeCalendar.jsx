@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocale } from "./i18n";
+import { parseDDMM } from "./dates";
 
 const DAY = 864e5;
 const strip = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -44,9 +45,9 @@ export default function RangeCalendar({ mode = "free", departures = [], value, o
     if (mode === "departures") {
       const dep = depByTime.get(d.getTime());
       if (!dep) return;
-      const [dd, mm] = String(dep.to || "").split("/").map(Number);
-      let end = dd && mm ? new Date(dep.when.getFullYear(), mm - 1, dd) : null;
-      if (end && end < dep.when) end = new Date(dep.when.getFullYear() + 1, mm - 1, dd);
+      const parsedTo = parseDDMM(dep.to);
+      let end = parsedTo ? new Date(dep.when.getFullYear(), parsedTo.month - 1, parsedTo.day) : null;
+      if (end && end < dep.when) end = new Date(dep.when.getFullYear() + 1, parsedTo.month - 1, parsedTo.day);
       onChange({ from: dep.when, to: end, dep });
       return;
     }

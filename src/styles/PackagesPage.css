@@ -698,3 +698,5 @@
 .pkg-hotel-col:last-child { border-right: none; }
 .pkg-hotel-col-label { font-size: 10px; color: #94a3b8; margin-bottom: 2px; }
 .pkg-hotel-col-value { font-size: 13px; font-weight: 700; color: #ff750e; }
+.pkg-hotel-col-avail { font-size: 10px; font-weight: 600; color: #94a3b8; margin-top: 2px; }
+.pkg-hotel-col-avail.over { color: #dc2626; }

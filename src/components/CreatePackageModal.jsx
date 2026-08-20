@@ -85,16 +85,13 @@ const defaultPackage = {
     { id: 7, num: "07", title: "Journée libre", badge: "", theme: "Détente & Plaisir", image: null, activities: [{ id: 1, label: "Shopping libre", optional: false }] },
     { id: 8, num: "08", title: "Istanbul → Casablanca", badge: "", theme: "Fin du séjour", image: null, activities: [{ id: 1, label: "Transfert aéroport", optional: false }, { id: 2, label: "Vol retour", optional: false }] },
   ],
-  hotelTableHeaders: ["Hôtel", "★", "Triple", "Double", "Single", "2–5 ans"],
-  hotels: [
-    { id: 1, name: "Grand Ons", stars: 4, cols: ["7 690", "7 790", "9 880", "5 200"] },
-    { id: 2, name: "Marmaray / Vatan Asur", stars: 4, cols: ["8 050", "8 150", "10 650", "5 200"] },
-    { id: 3, name: "Taksim Express", stars: 4, cols: ["8 750", "8 850", "12 100", "5 200"] },
-    { id: 4, name: "Grand Durmaz", stars: 4, cols: ["8 950", "9 050", "12 000", "5 200"] },
-    { id: 5, name: "Konak Hotel Taksim", stars: 4, cols: ["9 000", "9 100", "12 550", "5 200"] },
-    { id: 6, name: "Golden Age", stars: 4, cols: ["9 650", "9 750", "13 800", "5 200"] },
-  ],
-  hotelTableNote: "Tarifs par personne en dirhams – sous réserve de disponibilités",
+  // Empty on purpose — the old shape here (a flat "hotels" list of real-
+  // looking Istanbul hotels/prices) shipped as placeholder content on every
+  // new package, and stuck around silently on any package whose admin never
+  // opened the Hôtels & Formules tab. hotelCategories is the shape the
+  // current package editor actually reads/writes (see HotelsEditor in
+  // PackageeditorPage.jsx) — one entry per formule, added from the editor.
+  hotelCategories: [],
   departureDates: [
     { id: 1, from: "30/05", to: "06/06" }, { id: 2, from: "03/06", to: "10/06" },
     { id: 3, from: "06/06", to: "13/06" }, { id: 4, from: "10/06", to: "17/06" },
@@ -162,7 +159,7 @@ export default function CreatePackageModal({ pkg, onClose, onCreated }) {
       };
       if (pkg?.$id) {
         const result = await updatePackage(pkg.$id, {
-          ...pkg,
+          //...pkg,
           title: form.title.trim(),
           category: form.category,
           status: form.status,

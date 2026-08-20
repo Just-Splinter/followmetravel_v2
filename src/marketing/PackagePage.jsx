@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
+import { RECAPTCHA_SITE_KEY } from "../services/recaptcha";
 import { usePackages } from "../context/PackageViewerContext";
 import { ReservationProvider } from "../context/ReservationContext";
+import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
 import Header from "./Header";
 import { Footer } from "./Sections";
-import { Reveal, Arrow } from "./ui";
+import { Reveal, Arrow, FavoriteButton } from "./ui";
 import BookingFlow from "./BookingFlow";
 import { upcomingDepartures } from "./dates";
 import GeoMap from "./GeoMap";
 import { resolvePlace } from "./geo";
 import { localizeData } from "../services/translate";
+import { usePageMeta } from "./usePageMeta";
 import "./marketing.css";
 
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -87,6 +91,7 @@ export default function PackagePage({ previewDoc = null }) {
   const preview = !!previewDoc;
   const { fetchById, selectedPkg, loading } = usePackages();
   const { t, locale, isRTL } = useLocale();
+  const { trackPackageView, trackReserve } = useEvents();
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -112,6 +117,18 @@ export default function PackagePage({ previewDoc = null }) {
     const d = localizeData(raw, locale);
     return { ...d, $id: doc.$id, title: doc.title, basePrice: doc.basePrice, country: d.country || doc.country };
   }, [doc, locale]);
+
+  usePageMeta(
+    pkg?.title || pkg?.destination,
+    pkg?.tagline || pkg?.subtitleItalic || (pkg ? `${pkg.destination || pkg.title}${pkg.country ? ", " + pkg.country : ""}${pkg.durationLabel ? " — " + pkg.durationLabel : ""}` : undefined)
+  );
+
+  // Fires once per package (not per locale switch) — keyed on $id only.
+  useEffect(() => {
+    if (preview || !pkg?.$id) return;
+    trackPackageView({ targetId: pkg.$id, label: pkg.title || pkg.destination, page: window.location.pathname });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, pkg?.$id]);
 
   const images = useMemo(() => {
     if (!pkg) return [];
@@ -213,7 +230,11 @@ export default function PackagePage({ previewDoc = null }) {
     return () => io.disconnect();
   }, [pkg, chapters.length]);
 
-  const openBooking = (dateIdx = null) => { setBookDateIdx(dateIdx); setBooking(true); };
+  const openBooking = (dateIdx = null) => {
+    trackReserve({ targetId: pkg.$id, label: pkg.title || pkg.destination, page: window.location.pathname });
+    setBookDateIdx(dateIdx);
+    setBooking(true);
+  };
   const goCh = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   const flat = new URLSearchParams(window.location.search).has("flat");
@@ -294,6 +315,7 @@ export default function PackagePage({ previewDoc = null }) {
                   <span>{t("sr_per_person")} · {t("sr_night_note")}</span>
                 </div>
                 <button className="mk-btn" onClick={() => openBooking()}>{t("pk_book")}</button>
+                {!preview && <FavoriteButton id={pkg.$id} label={pkg.title || pkg.destination} className="mk-pk-fav" />}
               </div>
             </div>
 
@@ -532,15 +554,17 @@ export default function PackagePage({ previewDoc = null }) {
       )}
 
       {booking && (
-        <ReservationProvider>
-          <BookingFlow
-            pkg={pkg}
-            preview={preview}
-            prefill={{ adults: searchParams.get("adults"), date: searchParams.get("date") }}
-            initialDateIdx={bookDateIdx}
-            onClose={() => { setBooking(false); setBookDateIdx(null); }}
-          />
-        </ReservationProvider>
+        <GoogleReCaptchaProvider reCaptchaKey={RECAPTCHA_SITE_KEY}>
+          <ReservationProvider>
+            <BookingFlow
+              pkg={pkg}
+              preview={preview}
+              prefill={{ adults: searchParams.get("adults"), date: searchParams.get("date") }}
+              initialDateIdx={bookDateIdx}
+              onClose={() => { setBooking(false); setBookDateIdx(null); }}
+            />
+          </ReservationProvider>
+        </GoogleReCaptchaProvider>
       )}
     </div>
   );

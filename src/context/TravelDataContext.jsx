@@ -6,7 +6,7 @@ import {
   useEffect,
 } from "react";
 
-import db, { Collections, ID, Query } from "../services/database";
+import db, { Collections, ID, Query, PUBLIC_CATALOG_PERMISSIONS, PUBLIC_PACKAGE_STATUSES } from "../services/database";
 
 const TravelDataContext = createContext(null);
 
@@ -39,16 +39,18 @@ export function TravelDataProvider({ children }) {
   // ─── Generic CRUD factory ───────────────────────────────────────────────────
 
   const makeActions = (collection, setter , loading = false) => ({
+    // listAll, not list: `list` inherits Appwrite's 25-document default page
+    // size, which truncated the public site once a collection outgrew it.
     fetch: (queries = []) =>
       execute(async () => {
-        const res = await db.list(collection, queries);
+        const res = await db.listAll(collection, queries);
         setter(res.documents ?? res);
         return res;
       }, loading),
 
     create: (data) =>
       execute(async () => {
-        const doc = await db.create(collection, data, ID.unique());
+        const doc = await db.create(collection, data, ID.unique(), PUBLIC_CATALOG_PERMISSIONS);
         setter((prev) => [...prev, doc]);
         return doc;
       }),
@@ -78,7 +80,21 @@ export function TravelDataProvider({ children }) {
   const teamActions        = makeActions(Collections.TEAM,          setTeam);
   const testimonialActions = makeActions(Collections.TESTIMONIALS,  setTestimonials);
   const newsActions        = makeActions(Collections.NEWS,          setNews);
-  const packageActions     = makeActions(Collections.PRODUCTS,      setPackages, true);
+
+  // Overrides fetch only — create/update/remove/getOne stay as the factory
+  // makes them (unused for products from here anyway; the admin package
+  // manager reads/writes through PackagesContext instead, unfiltered by
+  // design since admins need to see drafts and archived packages too).
+  const packageActions = {
+    ...makeActions(Collections.PRODUCTS, setPackages, true),
+    fetch: (queries = []) =>
+      execute(async () => {
+        const res = await db.listAll(Collections.PRODUCTS, queries);
+        const docs = (res.documents ?? res).filter((p) => PUBLIC_PACKAGE_STATUSES.includes(p.status));
+        setPackages(docs);
+        return { ...res, documents: docs };
+      }, true),
+  };
 
   // ─── Bootstrap: load everything on mount ───────────────────────────────────
 

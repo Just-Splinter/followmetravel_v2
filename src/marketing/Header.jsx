@@ -79,6 +79,12 @@ export default function Header({ light = false }) {
               <button className="mk-nav-auth mk-hide-mobile" onClick={onAuth} style={{ fontSize: 13.5, fontWeight: 500 }}>
                 {authLabel}
               </button>
+              {user && user.labels?.includes("admin") && (
+                <button className="mk-btn mk-hide-mobile"  onClick={()=> navigate('/dashboard/home')} style={{ fontSize: 13.5, fontWeight: 500 }}>
+                  Administration
+                </button>
+              )}
+
               <button
                 className={`mk-burger ${open ? "is-open" : ""}`}
                 onClick={() => setOpen((o) => !o)}

@@ -2047,6 +2047,36 @@
   }
 }
 
+/* ─── Legal pages (CGV / confidentialité / cookies) ─────────────────────── */
+.mk-legal {
+  max-width: 760px;
+  padding-bottom: 96px;
+}
+.mk-legal-notice {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  background: rgba(27, 23, 19, 0.04);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 40px;
+}
+.mk-legal-notice a { color: var(--accent); }
+.mk-legal-section { margin-bottom: 36px; }
+.mk-legal-section h2 {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.mk-legal-section p {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+
 /* ─── Utilities ─────────────────────────────────────────────────────────── */
 /* The reCAPTCHA v3 badge is not used on marketing pages and overlaps the hero
    controls on mobile; hide it only when a marketing root is present. */
@@ -4089,6 +4119,14 @@ body:has(.mk) .grecaptcha-badge {
 .mk-bk-room:last-child {
   border-bottom: none;
 }
+.mk-bk-full {
+  display: inline-block;
+  margin-top: 4px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
 .mk-bk-room b {
   display: block;
   font-size: 13.5px;
@@ -5223,6 +5261,24 @@ body:has(.mk) .grecaptcha-badge {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.mk-pf-cancel-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid rgba(179, 38, 30, 0.35);
+  color: #b3261e;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms var(--ease), border-color 150ms var(--ease);
+}
+.mk-pf-cancel-btn:hover:not(:disabled) {
+  background: rgba(179, 38, 30, 0.08);
+  border-color: rgba(179, 38, 30, 0.5);
+}
+.mk-pf-cancel-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .mk-pf-tags {
   display: flex;
   flex-wrap: wrap;
@@ -5337,6 +5393,55 @@ body:has(.mk) .grecaptcha-badge {
   animation-delay: 0ms !important;
 }
 
+/* ─── Favorite button (heart toggle) ───────────────────────────────────── */
+.mk-fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 253, 249, 0.92);
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.2s var(--ease), color 0.2s, border-color 0.2s;
+}
+.mk-fav-btn:hover {
+  transform: scale(1.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mk-fav-btn.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.mk-fav-btn.is-active svg {
+  animation: mkFavPop 0.35s var(--ease);
+}
+@keyframes mkFavPop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.mk-sr-card figure {
+  position: relative;
+}
+.mk-sr-card figure .mk-fav-btn,
+.mk-sr-gcard figure .mk-fav-btn {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 10px;
+  z-index: 1;
+}
+
+.mk-pk-fav {
+  margin-inline-start: 10px;
+}
+
 /* ─── Reduced motion ────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .mk-rise,
@@ -5363,5 +5468,8 @@ body:has(.mk) .grecaptcha-badge {
   .mk-trip img,
   .mk-adv img {
     transition: none;
+  }
+  .mk-fav-btn.is-active svg {
+    animation: none;
   }
 }

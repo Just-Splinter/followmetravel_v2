@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocale } from "./i18n";
 import { useClickOutside } from "../components/ClickOutSide";
+import { useEvents } from "../context/EventsContext";
 import RangeCalendar from "./RangeCalendar";
 
 const S = 1.5;
@@ -29,6 +30,7 @@ const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 export default function HeroSearch({ destinations, heroSlides }) {
   const { t, locale } = useLocale();
   const navigate = useNavigate();
+  const { trackSearch } = useEvents();
 
   const [tab, setTab] = useState("holiday");
   const [query, setQuery] = useState("");
@@ -72,6 +74,7 @@ export default function HeroSearch({ destinations, heroSlides }) {
 
   const explore = () => {
     if (tab !== "holiday") { navigate("/contact"); return; }
+    trackSearch({ label: query.trim() || "(any destination)", action: destId ? "destination" : "text" });
     const params = new URLSearchParams();
     if (destId) params.set("dest", destId);
     if (range?.from) params.set("date", iso(range.from));

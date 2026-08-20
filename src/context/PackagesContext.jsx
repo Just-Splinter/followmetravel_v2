@@ -5,7 +5,7 @@ import {
   useCallback,
 } from "react";
 
-import db, { Collections, ID, Query } from "../services/database";
+import db, { Collections, ID, Query, PUBLIC_CATALOG_PERMISSIONS } from "../services/database";
 
 const PackageContext = createContext(null);
 
@@ -36,7 +36,8 @@ export function PackageProvider({ children }) {
           {
             ...pkg,
           },
-          ID.unique()
+          ID.unique(),
+          PUBLIC_CATALOG_PERMISSIONS
         )
       ),
     [execute]
@@ -81,7 +82,7 @@ export function PackageProvider({ children }) {
   const findPackages = useCallback(
     (queries = []) =>
       execute(() =>
-        db.list(
+        db.listAll(
           Collections.PRODUCTS,
           queries
         )

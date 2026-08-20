@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from "react";
-import db, { Collections, ID, Query } from "../services/database";
+import db, { Collections, ID, Query, ADMIN_ONLY_PERMISSIONS } from "../services/database";
 
 const MailContext = createContext(null);
 
@@ -31,7 +31,8 @@ export function MailProvider({ children }) {
             variables: JSON.stringify(template.variables || []),
             tags: JSON.stringify(template.tags || []),
           },
-          ID.unique()
+          ID.unique(),
+          ADMIN_ONLY_PERMISSIONS
         )
       ),
     [execute]
@@ -67,35 +68,7 @@ export function MailProvider({ children }) {
 
   const findTemplates = useCallback(
     (queries = []) =>
-      execute(() => db.list(Collections.EMAIL_TEMPLATES, queries)),
-    [execute]
-  );
-
-  const sendTestEmail = useCallback(
-    async (templateId, recipientEmail, variables = {}) =>
-      execute(async () => {
-        const response = await fetch("/api/email/send-test", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ templateId, recipientEmail, variables }),
-        });
-        if (!response.ok) throw new Error("Failed to send test email");
-        return await response.json();
-      }),
-    [execute]
-  );
-
-  const sendBulkEmail = useCallback(
-    async (templateId, recipientList, variables = {}) =>
-      execute(async () => {
-        const response = await fetch("/api/email/send-bulk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ templateId, recipientList, variables }),
-        });
-        if (!response.ok) throw new Error("Failed to send bulk email");
-        return await response.json();
-      }),
+      execute(() => db.listAll(Collections.EMAIL_TEMPLATES, queries)),
     [execute]
   );
 
@@ -107,8 +80,6 @@ export function MailProvider({ children }) {
     deleteTemplate,
     getTemplate,
     findTemplates,
-    sendTestEmail,
-    sendBulkEmail,
     Query,
   };
 

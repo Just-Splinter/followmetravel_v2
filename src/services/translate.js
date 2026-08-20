@@ -1,18 +1,19 @@
 // Automatic content translation for dashboard-authored products.
-// One OpenRouter call per product: the full translatable subset is sent as
+// One DeepSeek call per product: the full translatable subset is sent as
 // JSON and the model returns { en: {…}, ar: {…} } with the exact same shape.
 // The result is stored inside the product's `data.i18n` and overlaid on the
 // original content by `localizeData()` when the visitor's locale is en/ar.
 
 const API_KEY =
-  import.meta.env.OPENROUTER_API_KEY || import.meta.env.VITE_OPENROUTER_API_KEY;
+  import.meta.env.DEEPSEEK_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY;
+
+const API_URL = "https://api.deepseek.com/chat/completions";
 
 // Cheap-first model chain; unknown ids fall through to the next one.
 const MODELS = [
-  import.meta.env.VITE_OPENROUTER_MODEL,
-  "deepseek/deepseek-v4-flash",
-  "deepseek/deepseek-v4",
-  "deepseek/deepseek-chat",
+  import.meta.env.VITE_DEEPSEEK_MODEL,
+  "deepseek-v4-flash",
+  "deepseek-v4-pro",
 ].filter(Boolean);
 
 /** True when a key is configured — callers can skip silently otherwise. */
@@ -97,15 +98,13 @@ export function localizeData(data, locale) {
   return localized;
 }
 
-/* ── the single LLM call ────────────────────────────────────────────────── */
+/* ── the single LLM call (DeepSeek native API) ──────────────────────────── */
 async function callModel(model, source) {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await fetch(API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://followmetravel.ma",
-      "X-Title": "FollowMeTravel CMS",
     },
     body: JSON.stringify({
       model,
@@ -123,7 +122,10 @@ async function callModel(model, source) {
       ],
     }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = await res.json().catch((e) => {
+    console.error("[translate] Error parsing JSON response:", e);
+    return {};
+  });
   if (!res.ok) {
     const msg = body?.error?.message || `HTTP ${res.status}`;
     const notFound = res.status === 404 || res.status === 400 || /model|not found|invalid/i.test(msg);
@@ -132,6 +134,7 @@ async function callModel(model, source) {
     throw err;
   }
   const text = body.choices?.[0]?.message?.content || "";
+  console.log("[translate] model response", text);
   const parsed = JSON.parse(text.replace(/^```(json)?|```$/g, "").trim());
   if (!parsed.en || !parsed.ar) throw new Error("Model response missing en/ar");
   return parsed;
@@ -144,7 +147,7 @@ async function callModel(model, source) {
 export async function translateProductData(data) {
   if (!API_KEY) {
     throw new Error(
-      "OPENROUTER_API_KEY manquant dans .env (préfixe exposé au client via vite envPrefix)."
+      "DEEPSEEK_API_KEY manquant dans .env (préfixe exposé au client via vite envPrefix)."
     );
   }
   const source = extractTranslatable(data);

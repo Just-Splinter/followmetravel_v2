@@ -14,8 +14,16 @@ class StorageService {
         ID.unique(),
         file,
         [
+          // Public read: these are hero photos and package images served to
+          // anonymous visitors. Update/delete restricted to the admin label —
+          // every upload call site is an admin-only /dashboard page (package
+          // editor, hotels, hero slides), no customer ever needs write here.
+          // Role.users() would let any logged-in customer overwrite or delete
+          // every asset in the bucket, not just their own — this was widened
+          // once already (from Role.any()) but not far enough.
           Permission.read(Role.any()),
-          Permission.write(Role.any())
+          Permission.update(Role.label("admin")),
+          Permission.delete(Role.label("admin")),
         ]
       );
 

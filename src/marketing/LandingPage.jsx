@@ -17,10 +17,15 @@ import {
   CtaBand,
   Footer,
 } from "./Sections";
+import { usePageMeta } from "./usePageMeta";
 import "./marketing.css";
 
 export default function LandingPage() {
   const { packages, destinations, adventures, testimonials } = useTravelData();
+
+  // No args: falls back to the site's default title — resets the tab title
+  // when navigating back home from a package page that set its own.
+  usePageMeta();
 
   const heroSlides = useMemo(() => {
     const fromDb = heroSlidesFromPackages(packages);

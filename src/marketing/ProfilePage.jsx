@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { useReservation } from "../context/ReservationContext";
+import { useFavorites } from "../context/FavoritesContext";
+import { useTravelData } from "../context/TravelDataContext";
+import { localizeData } from "../services/translate";
 import { useLocale } from "./i18n";
 import Header from "./Header";
 import { Footer } from "./Sections";
-import { Reveal } from "./ui";
+import { FavoriteButton, Arrow } from "./ui";
 import "./marketing.css";
 
 const jparse = (v, fb) => { try { return JSON.parse(v) ?? fb; } catch { return fb; } };
@@ -18,13 +22,33 @@ const STATUS = {
   cancelled: { key: "st_cancelled", cls: "is-bad" },
 };
 
-function ReservationCard({ r, t, nf, dateFmt }) {
+// Cancelling only makes sense before the trip has happened and while it
+// isn't already cancelled — "completed"/"cancelled" are terminal statuses.
+const CANCELLABLE_STATUSES = ["pending", "confirmed", "paid"];
+
+function ReservationCard({ r, t, nf, dateFmt, onCancel }) {
   const [open, setOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const hotels = jparse(r.hotels, []);
   const participants = jparse(r.participants, []).filter((p) => p?.fullName);
   const payments = jparse(r.payments, []);
   const paid = payments.reduce((a, p) => a + (Number(p.amount) || 0), 0);
   const st = STATUS[r.status] || STATUS.pending;
+  const canCancel = CANCELLABLE_STATUSES.includes(r.status);
+
+  const handleCancel = async (e) => {
+    e.stopPropagation();
+    if (!window.confirm(t("pf_cancel_confirm"))) return;
+    setCancelling(true);
+    try {
+      await onCancel(r.$id);
+      toast.success(t("pf_cancel_ok"));
+    } catch {
+      toast.error(t("pf_cancel_err"));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <article className={`mk-pf-card ${open ? "is-open" : ""}`}>
@@ -83,18 +107,58 @@ function ReservationCard({ r, t, nf, dateFmt }) {
               </div>
             </div>
           )}
+          {canCancel && (
+            <button
+              type="button"
+              className="mk-pf-cancel-btn"
+              onClick={handleCancel}
+              disabled={cancelling}
+            >
+              {cancelling ? "…" : t("pf_cancel_btn")}
+            </button>
+          )}
         </div>
       )}
     </article>
   );
 }
 
+function FavoriteCard({ p, locale, nf, t, navigate }) {
+  const d = localizeData(jparse(p.data, {}), locale);
+  const img = d.heroBg || null;
+  const title = p.title || d.destination || "—";
+
+  return (
+    <article className="mk-sr-gcard" onClick={() => navigate(`/packages/view?pkgId=${p.$id}`)}>
+      <figure>
+        {img ? <img src={img} alt={title} loading="lazy" /> : <span className="mk-sr-imgfall">{title.charAt(0)}</span>}
+        <FavoriteButton id={p.$id} label={title} />
+      </figure>
+      <div className="mk-sr-gcard-meta">
+        <span>{p.country || d.country || "—"}</span>
+      </div>
+      <h3>{title}</h3>
+      <div className="mk-sr-gcard-foot">
+        <div className="mk-sr-price"><b>{nf.format(p.basePrice || 0)}</b> DH <span>{t("sr_per_person")}</span></div>
+        <span className="mk-sr-gcard-go"><Arrow size={14} /></span>
+      </div>
+    </article>
+  );
+}
+
 export default function ProfilePage() {
   const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
-  const { reservations, fetchMyReservations, loading } = useReservation();
+  const { reservations, fetchMyReservations, cancelReservation, loading } = useReservation();
+  const { ids: favoriteIds } = useFavorites();
+  const { packages } = useTravelData();
   const { t, locale } = useLocale();
   const navigate = useNavigate();
   const [tab, setTab] = useState(() => (window.location.hash === "#profil" ? "profile" : "res"));
+
+  const favoritePackages = useMemo(
+    () => (packages || []).filter((p) => favoriteIds.includes(p.$id)),
+    [packages, favoriteIds]
+  );
 
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
   const dateFmt = useMemo(
@@ -131,6 +195,12 @@ export default function ProfilePage() {
                     <dd>{String(reservations.length).padStart(2, "0")}</dd>
                   </div>
                 )}
+                {favoritePackages.length > 0 && (
+                  <div>
+                    <dt>{t("pf_tab_fav")}</dt>
+                    <dd>{String(favoritePackages.length).padStart(2, "0")}</dd>
+                  </div>
+                )}
                 {user?.$createdAt && (
                   <div>
                     <dt>{t("pf_member_since")}</dt>
@@ -154,6 +224,9 @@ export default function ProfilePage() {
                 <button role="tab" aria-selected={tab === "res"} className={tab === "res" ? "is-active" : ""} onClick={() => setTab("res")}>
                   {t("pf_tab_res")}{reservations.length ? ` (${reservations.length})` : ""}
                 </button>
+                <button role="tab" aria-selected={tab === "fav"} className={tab === "fav" ? "is-active" : ""} onClick={() => setTab("fav")}>
+                  {t("pf_tab_fav")}{favoritePackages.length ? ` (${favoritePackages.length})` : ""}
+                </button>
                 <button role="tab" aria-selected={tab === "profile"} className={tab === "profile" ? "is-active" : ""} onClick={() => setTab("profile")}>
                   {t("pf_tab_profile")}
                 </button>
@@ -171,7 +244,21 @@ export default function ProfilePage() {
                 ) : (
                   <div className="mk-pf-list">
                     {reservations.map((r) => (
-                      <ReservationCard key={r.$id} r={r} t={t} nf={nf} dateFmt={dateFmt} />
+                      <ReservationCard key={r.$id} r={r} t={t} nf={nf} dateFmt={dateFmt} onCancel={cancelReservation} />
+                    ))}
+                  </div>
+                )
+              ) : tab === "fav" ? (
+                favoritePackages.length === 0 ? (
+                  <div className="mk-sr-empty">
+                    <p className="mk-quote" style={{ fontSize: 26 }}>{t("fav_empty_t")}</p>
+                    <p style={{ color: "var(--ink-2)", margin: "10px 0 22px" }}>{t("fav_empty_d")}</p>
+                    <button className="mk-btn mk-btn--sm" onClick={() => navigate("/search")}>{t("pf_browse")}</button>
+                  </div>
+                ) : (
+                  <div className="mk-sr-grid">
+                    {favoritePackages.map((p) => (
+                      <FavoriteCard key={p.$id} p={p} locale={locale} nf={nf} t={t} navigate={navigate} />
                     ))}
                   </div>
                 )

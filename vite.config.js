@@ -10,4 +10,8 @@ export default defineConfig({
   // expose OPENROUTER_API_KEY from .env to the client (dashboard translation
   // calls run in-browser) alongside the standard VITE_ variables
   envPrefix: ['VITE_', 'OPENROUTER_'],
+  test: {
+    environment: 'node',
+    globals: false,
+  },
 })

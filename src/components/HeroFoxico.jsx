@@ -267,7 +267,7 @@ export default function HeroFoxico({ slides }) {
           </a>
           <nav className="fx-links">
             <a href="/#">Home</a>
-            <a href="/#about">About Us</a>
+            <a ="/#about">About Us</a>
             <a href="/#destination">Destination</a>
             <a href="/#testimonial">Testimonial</a>
             <a href="/#blog">Blog</a>

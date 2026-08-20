@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 import { useAuth } from "../context/AuthContext";
 import { useReservation } from "../context/ReservationContext";
+import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
 import { upcomingDepartures } from "./dates";
+import { ROOM_TYPES } from "../services/roomTypes";
+import db, { Collections } from "../services/database";
+import { parseBookedSnapshot } from "../context/HotelsContext";
 
 /* ─── Business contract (identical to the legacy modal / admin manager) ───── */
-const ROOM_TYPES = [
-  { key: "triple", label: "Triple", colIdx: 0, paxPerRoom: 3 },
-  { key: "double", label: "Double", colIdx: 1, paxPerRoom: 2 },
-  { key: "single", label: "Single", colIdx: 2, paxPerRoom: 1 },
-  { key: "child", label: "2–5 ans", colIdx: 3, paxPerRoom: 1 },
-];
 const DEFAULT_SUPPLEMENTS = [
   { key: "excursions", label: "Pack Excursions", pricePerPax: 800 },
   { key: "princes", label: "Îles des Princes + déjeuner", pricePerPax: 350 },
@@ -26,6 +24,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
   const { t, locale } = useLocale();
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const { createReservation } = useReservation();
+  const { trackPayment, trackAbandon } = useEvents();
   const { executeRecaptcha } = useGoogleReCaptcha();
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
   const fmt = (n) => `${nf.format(n)} DH`;
@@ -46,6 +45,42 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
   const perPerson = !hasPricedRooms;
   const ppPrice = Number(pkg.basePrice) || 0;
 
+  // Availability snapshot, keyed by hotelId — fetched by document id only
+  // (never a scan of the reservations collection), so this can safely run
+  // for an anonymous/logged-out visitor without exposing anyone else's
+  // booking. See HotelsContext.refreshAvailability() for how the snapshot
+  // itself gets kept current.
+  const [hotelDocs, setHotelDocs] = useState({});
+  useEffect(() => {
+    const ids = [...new Set(
+      categories.flatMap((c) => (c.hotels || []).map((h) => h.hotelId)).filter(Boolean)
+    )];
+    if (!ids.length) return;
+    let alive = true;
+    Promise.allSettled(ids.map((id) => db.get(Collections.HOTELS, id))).then((results) => {
+      if (!alive) return;
+      const map = {};
+      results.forEach((r) => { if (r.status === "fulfilled") map[r.value.$id] = r.value; });
+      setHotelDocs(map);
+    });
+    return () => { alive = false; };
+  }, [categories]);
+
+  // Capacity and the block flag are per-package (set in the package editor,
+  // on this hotel row) — the shared hotel catalog document only supplies
+  // the live booked count via its public bookedSnapshot.
+  const roomRemaining = (hotel, rt) => {
+    const total = Number(hotel.allotment?.[rt.colIdx]) || 0;
+    if (!total) return Infinity; // no allotment configured = not tracked
+    const doc = hotelDocs[hotel.hotelId];
+    const booked = doc
+      ? (parseBookedSnapshot(doc.bookedSnapshot)[pkg.$id] || []).find((r) => r.type === rt.label)?.booked || 0
+      : 0;
+    return total - booked;
+  };
+  const roomBlocked = (hotel, rt, nextQty) =>
+    !!hotel.blockWhenFull && nextQty > roomRemaining(hotel, rt);
+
   const [catIdx, setCatIdx] = useState(0);
   const [dateIdx, setDateIdx] = useState(initialDateIdx);
   const [rooms, setRooms] = useState({}); // {hotelIdx: {roomKey: qty}}
@@ -56,6 +91,19 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(null); // reservation result
+
+  // Funnel-abandon: fires once on unmount (close button, Escape, or the
+  // caller stops rendering us) unless the reservation went through.
+  const doneRef = useRef(false);
+  useEffect(() => { doneRef.current = !!done; }, [done]);
+  useEffect(() => {
+    return () => {
+      if (!doneRef.current) {
+        trackAbandon({ targetId: pkg.$id, label: pkg.title || pkg.destination, page: window.location.pathname });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const category = categories[catIdx] || null;
   const hotels = category?.hotels || [];
@@ -113,7 +161,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
       });
       if (hPax > 0) {
         baseTotal += hTotal; totalPax += hPax;
-        breakdown.push({ name: hotel.name, lines, total: hTotal, pax: hPax });
+        breakdown.push({ name: hotel.name, hotelId: hotel.hotelId || null, lines, total: hTotal, pax: hPax });
       }
     });
     return { breakdown, baseTotal, totalPax };
@@ -153,15 +201,27 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
     setError(null);
     try {
       const selectedDate = dates[dateIdx];
+      const packageTitle = `${pkg.destination ?? ""}${pkg.destinationAccent ?? ""}` || pkg.title || "";
+      // TRUST BOUNDARY: totalEstimate below (`grandTotal`) is computed
+      // entirely client-side from prices already visible in the page's own
+      // HTML/JS — nothing stops a visitor from editing it in devtools before
+      // this call fires. createReservation (ReservationContext.jsx) forwards
+      // this payload verbatim to Appwrite Function '6a312ae3000737bbe2ac',
+      // whose source lives outside this repo. That function MUST recompute
+      // the price server-side from packageId/category/hotels/dates and
+      // ignore/validate totalEstimate, or a booking's charged amount can be
+      // manipulated. Not something this repo can verify or fix — check the
+      // function's own source.
       const result = await createReservation({
         packageId: pkg.$id ?? pkg.id,
-        packageTitle: `${pkg.destination ?? ""}${pkg.destinationAccent ?? ""}` || pkg.title || "",
+        packageTitle,
         category: perPerson ? null : category?.label ?? null,
         hotels: JSON.stringify(
           perPerson
             ? []
             : breakdown.map((h) => ({
                 name: h.name,
+                hotelId: h.hotelId,
                 rooms: h.lines.map((l) => ({ type: l.label, qty: l.qty })),
                 subtotal: h.total,
                 pax: h.pax,
@@ -180,6 +240,31 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
         return;
       }
       setDone(result.reservation || {});
+      trackPayment({
+        targetId: pkg.$id,
+        label: packageTitle,
+        data: { totalEstimate: grandTotal, totalPax },
+      });
+      // Best-effort: bump the public snapshot so the very next visitor sees
+      // this booking without waiting for an admin to reopen the hotels page.
+      // Not atomic (read-then-write) — a rare concurrent double-booking on
+      // the last room just means the admin's next refresh corrects it.
+      // Scoped by pkg.$id: this package's booking must not touch another
+      // package's pool on the same hotel.
+      breakdown.forEach((h) => {
+        if (!h.hotelId) return;
+        const doc = hotelDocs[h.hotelId];
+        if (!doc) return;
+        const snapshot = parseBookedSnapshot(doc.bookedSnapshot);
+        const rows = snapshot[pkg.$id] || [];
+        h.lines.forEach((l) => {
+          const row = rows.find((s) => s.type === l.label);
+          if (row) row.booked = (row.booked || 0) + l.qty;
+          else rows.push({ type: l.label, booked: l.qty });
+        });
+        snapshot[pkg.$id] = rows;
+        db.update(Collections.HOTELS, h.hotelId, { bookedSnapshot: JSON.stringify(snapshot) }).catch(() => {});
+      });
     } catch (err) {
       setError(err?.message === "AUTH_REQUIRED" ? t("bk_auth_t") : err?.message || t("bk_err"));
     } finally {
@@ -324,16 +409,18 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
                         const price = parsePrice(h.cols?.[rt.colIdx]);
                         if (!price) return null;
                         const qty = sel[rt.key] || 0;
+                        const full = roomBlocked(h, rt, qty + 1);
                         return (
                           <div key={rt.key} className="mk-bk-room">
                             <div>
                               <b>{rt.label}</b>
                               <span>{fmt(price)} {t("bk_per_pax")} · {rt.paxPerRoom} {t("bk_room_per")}</span>
+                              {full && qty === 0 && <em className="mk-bk-full">{t("bk_room_full")}</em>}
                             </div>
                             <div className="mk-bk-stepper">
                               <button aria-label="−" disabled={qty === 0} onClick={() => setQty(hIdx, rt.key, -1)}>−</button>
                               <b>{qty}</b>
-                              <button aria-label="+" onClick={() => setQty(hIdx, rt.key, 1)}>+</button>
+                              <button aria-label="+" disabled={full} title={full ? t("bk_room_full") : undefined} onClick={() => setQty(hIdx, rt.key, 1)}>+</button>
                             </div>
                           </div>
                         );

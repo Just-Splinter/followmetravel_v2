@@ -383,7 +383,9 @@ export function Footer() {
             <ul>
               <li><a href="/#house" onClick={(e) => { e.preventDefault(); document.querySelector("#house")?.scrollIntoView({ behavior: "smooth" }); }}>{t("footer_about")}</a></li>
               <li><a href="/contact" onClick={(e) => { e.preventDefault(); navigate("/contact"); }}>{t("footer_contact")}</a></li>
-              <li><a href="#">{t("footer_terms")}</a></li>
+              <li><a href="/legal/cgv" onClick={(e) => { e.preventDefault(); navigate("/legal/cgv"); }}>{t("footer_terms")}</a></li>
+              <li><a href="/legal/confidentialite" onClick={(e) => { e.preventDefault(); navigate("/legal/confidentialite"); }}>{t("footer_privacy")}</a></li>
+              <li><a href="/legal/cookies" onClick={(e) => { e.preventDefault(); navigate("/legal/cookies"); }}>{t("footer_cookies")}</a></li>
               <li><a href="#">{t("footer_mice")}</a></li>
             </ul>
           </div>

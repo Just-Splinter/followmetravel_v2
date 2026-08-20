@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /login
+Disallow: /auth/
+
+Sitemap: https://www.followmetravel.ma/sitemap.xml

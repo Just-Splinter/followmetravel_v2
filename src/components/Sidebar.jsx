@@ -1,27 +1,32 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import styles from '../styles/Sidebar.module.css'
-import { useApp } from '../context/AppContext'
+import { usePendingReservations } from '../context/usePendingReservations'
+import { useAuth } from '../context/AuthContext'
+import { Mail, Settings, LayoutDashboard, Plane, ClipboardList, Hotel, ExternalLink, LogOut, Users } from 'lucide-react'
 
 const NAV = [
-  { to: '/dashboard/home', icon: '⊞', label: 'Tableau de bord' },
-  { to: '/dashboard/packages', icon: '✈', label: 'Packages' },
-  { to: '/dashboard/reservations', icon: '📋', label: 'Réservations', badge: true },
-  { to: '/dashboard/hotel', icon: '📋', label: 'Hotels', badge: true },
-
-  { to: '/dashboard/clients', icon: '👥', label: 'Clients' },
+  { to: '/dashboard/home', icon: LayoutDashboard, label: 'Tableau de bord' },
+  { to: '/dashboard/reservations', icon: ClipboardList, label: 'Réservations', badge: true },
+  { to: '/dashboard/clients', icon: Users, label: 'Clients' },
+  { to: '/dashboard/packages', icon: Plane, label: 'Packages' },
+  { to: '/dashboard/hotel', icon: Hotel, label: 'Hotels' },
 ]
 
 export default function Sidebar() {
-  const { stats } = useApp()
+  const pending = usePendingReservations()
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <aside className={styles.sidebar}>
-      {/* <div className={styles.logo}>
-        <div className={styles.logoIcon}>✈</div>
-        <div>
-          <div className={styles.logoName}>Follow Me Travel</div>
-        </div>
-      </div> */}
+      <div className={styles.logo}>
+        <img src="/logo-256.png" alt="Follow Me Travel" className={styles.logoImg} />
+      </div>
 
       <nav className={styles.nav}>
         <div className={styles.navGroup}>
@@ -33,10 +38,10 @@ export default function Sidebar() {
               end={item.to === '/'}
               className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
             >
-              <span className={styles.navIcon}>{item.icon}</span>
+              <item.icon className={styles.navIcon} size={20} />
               <span>{item.label}</span>
-              {item.badge && stats.pendingReservations > 0 && (
-                <span className={styles.badge}>{stats.pendingReservations}</span>
+              {item.badge && pending > 0 && (
+                <span className={styles.badge}>{pending}</span>
               )}
             </NavLink>
           ))}
@@ -48,35 +53,31 @@ export default function Sidebar() {
             to="/dashboard/settings"
             className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
           >
-            <span className={styles.navIcon}>⚙</span>
+            <Settings className={styles.navIcon} size={20} />
             <span>Paramètres</span>
           </NavLink>
           <NavLink
             to="/dashboard/mail"
             className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
           >
-            <span className={styles.navIcon}>⚙</span>
+            <Mail className={styles.navIcon} size={20} />
             <span>Mail Manager</span>
-          </NavLink>
-          <NavLink
-            to="/dashboard/ads"
-            className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
-          >
-            <span className={styles.navIcon}>⚙</span>
-            <span>Meta Ads</span>
           </NavLink>
         </div>
       </nav>
 
       <div className={styles.bottom}>
-        <NavLink target='_blanck'
+        <NavLink target='_blank'
           to="/"
           className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
         >
-          <span className={styles.navIcon}>⚙</span>
+          <ExternalLink className={styles.navIcon} size={20} />
           <span>ouvrir le site</span>
         </NavLink>
-        
+        <button type="button" onClick={handleLogout} className={`${styles.navItem} ${styles.logoutItem}`}>
+          <LogOut className={styles.navIcon} size={20} />
+          <span>Se déconnecter</span>
+        </button>
       </div>
     </aside>
   )

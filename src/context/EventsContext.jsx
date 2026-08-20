@@ -6,7 +6,16 @@ import {
   useEffect,
 } from "react";
 
+import { Permission, Role } from "appwrite";
 import db, { Collections, ID } from "../services/database";
+
+// Analytics events are written by every visitor, including anonymous ones —
+// creation can't be restricted at the document level (Appwrite only lets a
+// document's own permissions govern read/update/delete, not who's allowed
+// to create one; that's the collection's own "create" permission, which
+// must stay open). Read is admin-only, so no visitor can scrape another
+// session's tracked pages/clicks via a direct API call.
+const EVENT_PERMISSIONS = [Permission.read(Role.label("admin"))];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -58,7 +67,7 @@ export function EventsProvider({ children }) {
     // on parallélise avec Promise.allSettled pour ne jamais bloquer)
     await Promise.allSettled(
       batch.map((event) =>
-        db.create(Collections.EVENTS, event, ID.unique())
+        db.create(Collections.EVENTS, event, ID.unique(), EVENT_PERMISSIONS)
       )
     );
   }, []);

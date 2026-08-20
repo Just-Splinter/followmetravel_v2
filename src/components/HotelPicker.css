@@ -1,0 +1,103 @@
+.hp-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Structural sizing, always applied — kept separate from the visual
+   defaults below so a host page's own input class (inputClassName) can
+   replace the look without also needing to redeclare width/box-sizing. */
+.hp-field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hp-input {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px 13px;
+  outline: none;
+  transition: all 0.2s;
+}
+.hp-input:focus {
+  border-color: #ff750e;
+  box-shadow: 0 0 0 3px rgba(255, 117, 14, 0.1);
+}
+
+.hp-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.hp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #1e293b;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.hp-item:hover {
+  background: #fff4ec;
+}
+.hp-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-item-meta {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-style: normal;
+  font-size: 10.5px;
+}
+
+/* ─── Dark variant (package editor) ─── */
+.hp-wrap--dark .hp-input {
+  background: #0a1520;
+  border: 1px solid #1e2d3d;
+  border-radius: 6px;
+  color: #c9d8e8;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.hp-wrap--dark .hp-input:focus {
+  border-color: #f59e42;
+  box-shadow: none;
+}
+.hp-wrap--dark .hp-pop {
+  background: #0d1a26;
+  border: 1px solid #1e2d3d;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+.hp-wrap--dark .hp-item {
+  color: #c9d8e8;
+}
+.hp-wrap--dark .hp-item:hover {
+  background: rgba(245, 158, 66, 0.1);
+}
+.hp-wrap--dark .hp-item-meta {
+  color: #5a7a94;
+}

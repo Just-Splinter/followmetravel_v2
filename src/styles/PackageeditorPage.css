@@ -113,7 +113,7 @@
 
 /* ─── Palette Sidebar ─── */
 .ed-palette-sidebar {
-    width: 64px;
+    width: var(--ed-palette-width, 64px);
     background: #0f1923;
     border-right: 1px solid #1e2d3d;
     display: flex;
@@ -123,6 +123,23 @@
     flex-shrink: 0;
     position: relative;
     animation: edSlideInLeft 0.4s ease;
+}
+
+.ed-palette-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 5;
+    background: transparent;
+    touch-action: none;
+}
+
+.ed-palette-resize-handle:hover,
+.ed-palette-resize-handle:active {
+    background: rgba(245, 158, 66, 0.35);
 }
 
 .ed-palette-close {
@@ -184,7 +201,7 @@
 
 .ed-palette-flyout {
     position: absolute;
-    left: 72px;
+    left: calc(var(--ed-palette-width, 64px) + 8px);
     top: 0;
     width: 280px;
     background: #0d1a26;
@@ -618,12 +635,30 @@
 
 /* ─── Editor Panel ─── */
 .ed-editor-panel {
-    width: 440px;
+    width: var(--ed-editor-width, 440px);
     background: #0f1923;
     border-left: 1px solid #1e2d3d;
     overflow-y: auto;
     flex-shrink: 0;
+    position: relative;
     animation: edSlideInRight 0.4s ease;
+}
+
+.ed-editor-resize-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 20;
+    background: transparent;
+    touch-action: none;
+}
+
+.ed-editor-resize-handle:hover,
+.ed-editor-resize-handle:active {
+    background: rgba(245, 158, 66, 0.35);
 }
 
 .ed-editor-panel::-webkit-scrollbar {
@@ -1471,31 +1506,118 @@
     border-color: #f59e42;
 }
 
+/* ─── Hotel row availability (per-package allotment) ─── */
+.ed-hotel-avail-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: -2px 0 10px 4px;
+    padding: 8px 10px;
+    background: #0a1520;
+    border: 1px solid #1e2d3d;
+    border-radius: 6px;
+}
+
+.ed-hotel-avail-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.ed-hotel-avail-label {
+    font-size: 10.5px;
+    color: #5a7a94;
+}
+
+.ed-hotel-avail-input {
+    width: 48px;
+    background: #0f1923;
+    border: 1px solid #1e2d3d;
+    border-radius: 4px;
+    color: #c9d8e8;
+    font-size: 11px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.ed-hotel-avail-input:focus {
+    outline: none;
+    border-color: #f59e42;
+}
+
+.ed-hotel-avail-count {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #5a7a94;
+}
+
+.ed-hotel-avail-count.over {
+    color: #f87171;
+}
+
+.ed-hotel-avail-block {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-inline-start: auto;
+    font-size: 10.5px;
+    color: #c9d8e8;
+    cursor: pointer;
+}
+
+.ed-hotel-avail-hint {
+    margin: -2px 0 10px 4px;
+    font-size: 10.5px;
+    color: #5a7a94;
+    font-style: italic;
+}
+
 /* ─── Dates Editor ─── */
 .ed-date-row {
     display: flex;
     gap: 10px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     align-items: center;
     animation: edFadeIn 0.3s ease;
 }
 
-.ed-date-input {
-    width: 80px;
-    background: #0a1520;
-    border: 1px solid #1e2d3d;
-    border-radius: 6px;
-    color: #c9d8e8;
-    font-size: 12px;
-    padding: 6px 10px;
-    text-align: center;
-    transition: border-color 0.2s;
-    font-family: inherit;
+.ed-date-endpoint {
+    display: flex;
+    gap: 6px;
 }
 
-.ed-date-input:focus {
-    outline: none;
-    border-color: #f59e42;
+.ed-date-select {
+    width: auto;
+    padding: 6px 8px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+
+.ed-date-select-day {
+    min-width: 46px;
+}
+
+.ed-date-select-month {
+    min-width: 64px;
+}
+
+.ed-date-row.invalid .ed-date-select {
+    border-color: rgba(248, 113, 113, 0.55);
+}
+
+.ed-date-warning {
+    font-size: 10.5px;
+    line-height: 1.4;
+    margin: 0 0 10px 2px;
+}
+
+.ed-date-warning.error {
+    color: #f87171;
+}
+
+.ed-date-warning.info {
+    color: #7d97ac;
 }
 
 .ed-date-separator {
@@ -1714,6 +1836,10 @@
         border-bottom: 1px solid #1e2d3d;
     }
 
+    .ed-palette-resize-handle {
+        display: none;
+    }
+
     .ed-palette-list {
         flex-direction: row;
         gap: 8px;
@@ -1759,6 +1885,10 @@
         width: 100%;
         border-left: none;
         border-top: 1px solid #1e2d3d;
+    }
+
+    .ed-editor-resize-handle {
+        display: none;
     }
 
     .ed-preview-panel {

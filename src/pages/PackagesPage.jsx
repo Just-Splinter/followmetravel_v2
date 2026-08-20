@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Modal } from "../components/UI";
 import PackageEditorPage from "./PackageeditorPage";
 import { usePackages } from "../context/PackagesContext";
+import { useHotels } from "../context/HotelsContext";
+import { ROOM_TYPES } from "../services/roomTypes";
 import CreatePackageModal from "../components/CreatePackageModal";
 import { TravelDataProvider } from "../context/TravelDataContext";
 import { useClickOutside } from "../components/ClickOutSide";
@@ -32,7 +34,18 @@ function normalize(p) {
     : "—";
   const basePrice = parseInt(String(data.basePrice).replace(/\s/g, ""), 10) || 0;
   const departureDates = data.departureDates || [];
-  const hotels = data.hotels || data.hotelCategories || [];
+  // Packages edited in the current package editor carry data.hotelCategories
+  // — one entry per formule (4★, 5★...), each with its own hotels/tableHeaders/
+  // note. Older, never-re-saved packages instead have a flat data.hotels list
+  // from before formules existed — wrapped here as a single implicit category
+  // so they still render, instead of `data.hotels || data.hotelCategories`
+  // silently handing a list of *category* objects to code that expects hotels
+  // (that mismatch is why the admin detail view stopped reflecting real data).
+  const hotelCategories = data.hotelCategories?.length
+    ? data.hotelCategories
+    : data.hotels?.length
+      ? [{ id: "legacy", label: null, hotels: data.hotels, tableHeaders: data.hotelTableHeaders, note: data.hotelTableNote }]
+      : [];
   const country = data.country || p.continent || "";
 
   const enrichedData = {
@@ -44,7 +57,7 @@ function normalize(p) {
     country,
     basePrice,
     departureDates,
-    hotels,
+    hotelCategories,
   };
 
   return {
@@ -63,6 +76,9 @@ function normalize(p) {
     data: enrichedData,
   };
 }
+
+const countHotels = (categories) =>
+  (categories || []).reduce((n, cat) => n + (cat.hotels?.length || 0), 0);
 
 const CATEGORY_META = {
   summer: { label: "Summer", color: "#0ea5e9", bg: "#eff6ff", text: "#0369a1" },
@@ -728,7 +744,7 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
             { icon: "ti-world", label: pkg.continent },
             { icon: "ti-map-pin", label: pkg.country },
             { icon: "ti-calendar", label: `${pkg.data.departureDates.length} départ${pkg.data.departureDates.length !== 1 ? "s" : ""}` },
-            { icon: "ti-bed", label: `${pkg.data.hotels.length} hôtel${pkg.data.hotels.length !== 1 ? "s" : ""}` },
+            { icon: "ti-bed", label: (() => { const n = countHotels(pkg.data.hotelCategories); return `${n} hôtel${n !== 1 ? "s" : ""}`; })() },
           ].map((m, i) => (
             <div key={i} className="pkg-card-meta-item">
               <i className={`ti ${m.icon}`} aria-hidden="true" />
@@ -761,7 +777,7 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
             <i className="ti ti-eye" aria-hidden="true" /> Détails
           </button>
           <button onClick={e => { e.stopPropagation(); onEdit(); }} className="em-action-btn primary" style={{ flex: 1, justifyContent: "center" }}>
-            <i className="ti ti-edit" aria-hidden="true" /> Package Editor
+            <i className="ti ti-edit" aria-hidden="true" /> Editor
           </button>
           <button
             onClick={e => { e.stopPropagation(); onTranslate && onTranslate(); }}
@@ -820,6 +836,14 @@ function PackageRow({ pkg, selected, onSelect, onDetail, onDelete, onEdit, onTra
         <button onClick={onEdit} className="pkg-row-action-btn edit">
           <i className="ti ti-edit" aria-hidden="true" />
         </button>
+        <button
+          onClick={() => onTranslate && onTranslate()}
+          className="pkg-row-action-btn"
+          disabled={translating}
+          title="Mettre à jour les traductions (EN/AR)"
+        >
+          {translating ? "…" : <i className="ti ti-language" aria-hidden="true" />}
+        </button>
         <button onClick={onDelete} className="pkg-row-action-btn danger">
           <i className="ti ti-trash" aria-hidden="true" />
         </button>
@@ -832,6 +856,8 @@ function PackageRow({ pkg, selected, onSelect, onDetail, onDelete, onEdit, onTra
 function DetailPanel({ pkg, onClose, onDelete, onEdit, onTranslate, translating }) {
   const st = STATUS_META[pkg.status] || STATUS_META.draft;
   const [tab, setTab] = useState("overview");
+  const { refreshAvailability } = useHotels();
+  useEffect(() => { refreshAvailability(); }, [refreshAvailability]);
 
   return (
     <div className="pkg-detail-overlay" onClick={onClose}>
@@ -1008,38 +1034,74 @@ function DeparturesTab({ pkg }) {
 }
 
 function HotelsTab({ pkg }) {
-  const headers = pkg.hotelTableHeaders || ["Hôtel", "★", "Triple", "Double", "Single", "2–5 ans"];
-  const colHeaders = headers.slice(2);
+  const { getBooked } = useHotels();
+  const categories = pkg.data.hotelCategories || [];
+
+  if (!categories.length) {
+    return (
+      <Section title="Hôtels & Tarifs">
+        <p style={{ fontSize: 13, color: "#94a3b8" }}>Aucune formule hôtelière configurée pour ce package.</p>
+      </Section>
+    );
+  }
+
   return (
     <div>
-      <Section title={`${pkg.data.hotels.length} hôtel${pkg.data.hotels.length !== 1 ? "s" : ""} disponibles`}>
-        {pkg.data.hotels.map(h => (
-          <div key={h.id} className="pkg-hotel-card">
-            <div className="pkg-hotel-head">
-              <div className="pkg-hotel-icon">
-                <i className="ti ti-building" aria-hidden="true" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 500, fontSize: 14 }}>{h.name}</div>
-                <div style={{ fontSize: 12, color: "#d97706", marginTop: 2 }}>{"★".repeat(h.stars)}</div>
-              </div>
-            </div>
-            {h.cols && h.cols.length > 0 && (
-              <div className="pkg-hotel-cols" style={{ gridTemplateColumns: `repeat(${colHeaders.length}, 1fr)` }}>
-                {colHeaders.map((col, ci) => (
-                  <div key={ci} className="pkg-hotel-col">
-                    <div className="pkg-hotel-col-label">{col}</div>
-                    <div className="pkg-hotel-col-value">{h.cols[ci] || "—"}</div>
+      {categories.map((cat, catIdx) => {
+        const hotels = cat.hotels || [];
+        // Price columns are always the last N headers, where N = cols.length
+        // on the hotel rows — robust whether this category came from the
+        // current editor (4 fixed prefix columns: Hôtel/Ville/Nuits/★) or an
+        // old never-re-saved package (2-prefix legacy shape).
+        const colCount = hotels[0]?.cols?.length || 0;
+        const headers = cat.tableHeaders || [];
+        const colHeaders = colCount ? headers.slice(headers.length - colCount) : [];
+        const title = cat.label
+          ? `${cat.label} — ${hotels.length} hôtel${hotels.length !== 1 ? "s" : ""}`
+          : `${hotels.length} hôtel${hotels.length !== 1 ? "s" : ""} disponible${hotels.length !== 1 ? "s" : ""}`;
+
+        return (
+          <Section key={cat.id ?? catIdx} title={title}>
+            {hotels.map(h => (
+              <div key={h.id} className="pkg-hotel-card">
+                <div className="pkg-hotel-head">
+                  <div className="pkg-hotel-icon">
+                    <i className="ti ti-building" aria-hidden="true" />
                   </div>
-                ))}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500, fontSize: 14 }}>{h.name}</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                      {[h.city, h.nights ? `${h.nights}N` : null].filter(Boolean).join(" · ")}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#d97706", marginTop: 2 }}>{"★".repeat(h.stars || 0)}</div>
+                  </div>
+                </div>
+                {h.cols && h.cols.length > 0 && (
+                  <div className="pkg-hotel-cols" style={{ gridTemplateColumns: `repeat(${colHeaders.length}, 1fr)` }}>
+                    {colHeaders.map((col, ci) => {
+                      const rt = ROOM_TYPES.find(t => t.colIdx === ci);
+                      const total = rt ? Number(h.allotment?.[rt.colIdx]) || 0 : 0;
+                      const booked = total > 0 && h.hotelId ? getBooked(h.hotelId, pkg.$id, rt.label) : null;
+                      return (
+                        <div key={ci} className="pkg-hotel-col">
+                          <div className="pkg-hotel-col-label">{col}</div>
+                          <div className="pkg-hotel-col-value">{h.cols[ci] || "—"}</div>
+                          {booked !== null && (
+                            <div className={`pkg-hotel-col-avail ${booked > total ? "over" : ""}`}>{booked}/{total}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+            ))}
+            {cat.note && (
+              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, fontStyle: "italic" }}>{cat.note}</p>
             )}
-          </div>
-        ))}
-        {pkg.hotelTableNote && (
-          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, fontStyle: "italic" }}>{pkg.hotelTableNote}</p>
-        )}
-      </Section>
+          </Section>
+        );
+      })}
     </div>
   );
 }

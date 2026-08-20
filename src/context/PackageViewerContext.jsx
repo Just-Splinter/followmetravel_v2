@@ -5,7 +5,7 @@ import {
   useCallback,
 } from "react";
 
-import db, { Collections, ID, Query } from "../services/database";
+import db, { Collections, ID, Query, PUBLIC_PACKAGE_STATUSES } from "../services/database";
 
 const PackageContext = createContext(null);
 
@@ -56,7 +56,7 @@ export function PackageViewerProvider({ children }) {
   const findPackages = useCallback(
     (queries = []) =>
       execute(async () => {
-        const result = await db.list(Collections.PRODUCTS, queries);
+        const result = await db.listAll(Collections.PRODUCTS, queries);
         setPackages(result.documents ?? result);
         return result;
       }),
@@ -69,6 +69,17 @@ export function PackageViewerProvider({ children }) {
     (id) =>
       execute(async () => {
         const doc = await db.get(Collections.PRODUCTS, id);
+
+        // A draft/archived package must be just as unreachable by direct
+        // link (?pkgId=) as it is from the listings PublicShell filters out
+        // (TravelDataContext) — same "not found" outcome either way, so a
+        // guessed or bookmarked link to unpublished content reveals nothing.
+        // Preview mode in the package editor never goes through fetchById —
+        // it renders previewDoc directly — so this doesn't affect that.
+        if (!PUBLIC_PACKAGE_STATUSES.includes(doc?.status)) {
+          setSelectedPkg(null);
+          return null;
+        }
 
         // Si le champ `data` est un JSON stringifié, on le parse
         const pkg =
