@@ -5,6 +5,7 @@ import MarketingPackagePreview from "../marketing/PackagePreview";
 import { withTranslations, translationConfigured } from "../services/translate";
 import { daysInMonth, parseDDMM, formatDDMM } from "../marketing/dates";
 import HotelPicker from "../components/HotelPicker";
+import { useClickOutside } from "../components/ClickOutSide";
 import StorageService from "../services/storage";
 import { ROOM_TYPES } from "../services/roomTypes";
 import { useHotels } from "../context/HotelsContext";
@@ -1208,47 +1209,133 @@ function HotelsEditor({ pkg, packageId, update }) {
 // ─── Dates de départ ────────────────────────────────────────────
 // Stored as year-less "DD/MM" strings — see marketing/dates.js, which owns
 // parsing/formatting so the editor and the public site can't drift apart.
-// Day/month selects make invalid input impossible to type (no free text, no
-// out-of-range day, day auto-clamped when the month shrinks the range).
-const MONTHS_FR = [
-  { value: 1, label: "Jan" }, { value: 2, label: "Fév" }, { value: 3, label: "Mar" },
-  { value: 4, label: "Avr" }, { value: 5, label: "Mai" }, { value: 6, label: "Juin" },
-  { value: 7, label: "Juil" }, { value: 8, label: "Août" }, { value: 9, label: "Sep" },
-  { value: 10, label: "Oct" }, { value: 11, label: "Nov" }, { value: 12, label: "Déc" },
+// Calendar-only entry (see PeriodPicker below): day/month <select> pairs
+// used to sit here too, but picking blind from two dropdowns with no
+// visual sense of the resulting window was the actual complaint — the
+// calendar is now the only way in, and it displays the resulting period
+// directly on its own trigger instead of leaving two "Jour/Mois"
+// placeholders showing until both are picked.
+const MONTHS_FULL_FR = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
+const WEEKDAYS_MON_FR = ["L", "M", "M", "J", "V", "S", "D"];
 
-function DateEndpoint({ value, onChange }) {
-  const parsed = parseDDMM(value);
-  const day = parsed?.day ?? "";
-  const month = parsed?.month ?? "";
+const sameEndpoint = (a, b) => !!a && !!b && a.day === b.day && a.month === b.month;
 
-  // Only emit once both sides are picked — a lone day or month is not a
-  // valid "DD/MM" and would silently vanish from the public site otherwise.
-  const emit = (nextDay, nextMonth) => {
-    if (!nextDay || !nextMonth) { onChange(""); return; }
-    onChange(formatDDMM(Math.min(nextDay, daysInMonth(nextMonth)), nextMonth));
+/**
+ * Grid cells for one month view, Monday-first, with greyed leading/trailing
+ * days from adjacent months for visual continuity. GRID_REF_YEAR only
+ * decides which weekday day 1 falls on for layout — day *counts* per month
+ * come from daysInMonth() (marketing/dates.js), which always treats Feb as
+ * 28 days, so the grid never offers a 29/02 that parseDDMM would reject.
+ */
+const GRID_REF_YEAR = 2023;
+function monthCells(month) {
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const total = daysInMonth(month);
+  const prevTotal = daysInMonth(prevMonth);
+  const lead = (new Date(GRID_REF_YEAR, month - 1, 1).getDay() + 6) % 7; // Mon-first offset
+
+  const cells = [];
+  for (let i = lead - 1; i >= 0; i--) cells.push({ day: prevTotal - i, month: prevMonth, out: true });
+  for (let d = 1; d <= total; d++) cells.push({ day: d, month, out: false });
+  for (let d = 1; cells.length < 42; d++) cells.push({ day: d, month: nextMonth, out: true });
+  return cells;
+}
+
+/**
+ * Calendar-only period picker — the trigger itself shows the resolved
+ * "DD/MM → DD/MM" once both ends are picked (or a placeholder while empty),
+ * so the row always reads as a period rather than two blank inputs. First
+ * click sets "from", second sets "to" — no chronological guard between them
+ * (unlike a real-date range picker), because a "to" earlier than "from" is
+ * a legitimate year-wrap window here (e.g. 28/12 → 05/01), exactly what the
+ * "reversed" info-warning in DatesEditor already expects rather than
+ * rejects.
+ */
+function PeriodPicker({ from, to, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(() => ({ from: parseDDMM(from), to: parseDDMM(to) }));
+  const [viewMonth, setViewMonth] = useState(() => parseDDMM(from)?.month || new Date().getMonth() + 1);
+  const ref = useRef(null);
+  useClickOutside(ref, () => setOpen(false));
+
+  const parsedFrom = parseDDMM(from);
+  const parsedTo = parseDDMM(to);
+  const hasPeriod = !!(parsedFrom && parsedTo);
+
+  const openPicker = () => {
+    setDraft({ from: parsedFrom, to: parsedTo });
+    setViewMonth(parsedFrom?.month || new Date().getMonth() + 1);
+    setOpen(true);
+  };
+
+  const pick = (cell) => {
+    const point = { day: cell.day, month: cell.month };
+    setDraft((d) => (!d.from || (d.from && d.to) ? { from: point, to: null } : { ...d, to: point }));
+  };
+
+  const confirm = () => {
+    if (!draft.from || !draft.to) return;
+    onPick(formatDDMM(draft.from.day, draft.from.month), formatDDMM(draft.to.day, draft.to.month));
+    setOpen(false);
+  };
+
+  const cellClass = (cell) => {
+    const out = ["ed-cal-day"];
+    if (cell.out) out.push("out");
+    if (sameEndpoint(cell, draft.from) || sameEndpoint(cell, draft.to)) out.push("edge");
+    else if (
+      draft.from && draft.to && draft.from.month === draft.to.month && cell.month === draft.from.month &&
+      cell.day > Math.min(draft.from.day, draft.to.day) && cell.day < Math.max(draft.from.day, draft.to.day)
+    ) out.push("mid");
+    return out.join(" ");
   };
 
   return (
-    <div className="ed-date-endpoint">
-      <select
-        value={day}
-        onChange={e => emit(Number(e.target.value) || null, month || null)}
-        className="ed-select ed-date-select ed-date-select-day"
+    <div ref={ref} className="ed-cal-trigger-wrap">
+      <button
+        type="button"
+        className={`ed-period-trigger ${hasPeriod ? "" : "empty"}`}
+        onClick={() => (open ? setOpen(false) : openPicker())}
       >
-        <option value="" disabled>Jour</option>
-        {Array.from({ length: daysInMonth(month || 12) }, (_, i) => i + 1).map(d => (
-          <option key={d} value={d}>{d}</option>
-        ))}
-      </select>
-      <select
-        value={month}
-        onChange={e => emit(day || null, Number(e.target.value) || null)}
-        className="ed-select ed-date-select ed-date-select-month"
-      >
-        <option value="" disabled>Mois</option>
-        {MONTHS_FR.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-      </select>
+        <Calendar size={13} />
+        <span>
+          {hasPeriod
+            ? `${formatDDMM(parsedFrom.day, parsedFrom.month)} → ${formatDDMM(parsedTo.day, parsedTo.month)}`
+            : "Sélectionner une période"}
+        </span>
+      </button>
+      {open && (
+        <div className="ed-cal-pop">
+          <div className="ed-cal-head">
+            <button type="button" onClick={() => setViewMonth((m) => (m === 1 ? 12 : m - 1))} aria-label="Mois précédent">‹</button>
+            <b>{MONTHS_FULL_FR[viewMonth - 1]}</b>
+            <button type="button" onClick={() => setViewMonth((m) => (m === 12 ? 1 : m + 1))} aria-label="Mois suivant">›</button>
+          </div>
+          <div className="ed-cal-grid">
+            {WEEKDAYS_MON_FR.map((w, i) => <span key={i} className="ed-cal-dow">{w}</span>)}
+            {monthCells(viewMonth).map((cell, i) => (
+              <button key={i} type="button" className={cellClass(cell)} onClick={() => pick(cell)}>
+                {cell.day}
+              </button>
+            ))}
+          </div>
+          <div className="ed-cal-foot">
+            <span className="ed-cal-chip">
+              {draft.from ? formatDDMM(draft.from.day, draft.from.month) : "—"}
+              {" → "}
+              {draft.to ? formatDDMM(draft.to.day, draft.to.month) : "—"}
+            </span>
+            <div className="ed-cal-actions">
+              <button type="button" className="ed-cal-clear" onClick={() => setDraft({ from: null, to: null })}>Effacer</button>
+              <button type="button" className="ed-cal-confirm" disabled={!draft.from || !draft.to} onClick={confirm}>Valider</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1256,8 +1343,12 @@ function DateEndpoint({ value, onChange }) {
 function DatesEditor({ pkg, update }) {
   const dates = pkg.departureDates || [];
 
-  const updateDate = (id, field, val) =>
-    update("departureDates", dates.map(d => d.id === id ? { ...d, [field]: val } : d));
+  // Sets from/to together in one update — writing them via two sequential
+  // single-field updates would each read the same stale `dates` closure and
+  // the second call would silently drop the first's change (the exact bug
+  // pattern already fixed elsewhere in this file).
+  const updateDateFields = (id, fields) =>
+    update("departureDates", dates.map(d => d.id === id ? { ...d, ...fields } : d));
 
   const addDate = () =>
     update("departureDates", [...dates, { id: uid(), from: "", to: "" }]);
@@ -1281,9 +1372,11 @@ function DatesEditor({ pkg, update }) {
         return (
           <div key={d.id}>
             <div className={`ed-date-row ${incomplete ? "invalid" : ""}`}>
-              <DateEndpoint value={d.from} onChange={v => updateDate(d.id, "from", v)} />
-              <span className="ed-date-separator">→</span>
-              <DateEndpoint value={d.to} onChange={v => updateDate(d.id, "to", v)} />
+              <PeriodPicker
+                from={d.from}
+                to={d.to}
+                onPick={(from, to) => updateDateFields(d.id, { from, to })}
+              />
               <RemoveBtn onClick={() => removeDate(d.id)} />
             </div>
             {incomplete && (

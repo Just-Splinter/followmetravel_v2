@@ -1582,30 +1582,6 @@
     animation: edFadeIn 0.3s ease;
 }
 
-.ed-date-endpoint {
-    display: flex;
-    gap: 6px;
-}
-
-.ed-date-select {
-    width: auto;
-    padding: 6px 8px;
-    text-align: center;
-    transition: border-color 0.2s;
-}
-
-.ed-date-select-day {
-    min-width: 46px;
-}
-
-.ed-date-select-month {
-    min-width: 64px;
-}
-
-.ed-date-row.invalid .ed-date-select {
-    border-color: rgba(248, 113, 113, 0.55);
-}
-
 .ed-date-warning {
     font-size: 10.5px;
     line-height: 1.4;
@@ -1620,9 +1596,185 @@
     color: #7d97ac;
 }
 
-.ed-date-separator {
-    color: #f59e42;
+/* ─── Date range calendar (sole entry point for a departure period) ─── */
+.ed-cal-trigger-wrap {
+    position: relative;
+    flex: 1;
+}
+
+.ed-period-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid #1e2d3d;
+    background: #0a1520;
+    color: #c9d8e8;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ed-period-trigger:hover {
+    border-color: #f59e42;
+}
+
+.ed-period-trigger.empty {
+    color: #5a7a94;
+}
+
+.ed-date-row.invalid .ed-period-trigger {
+    border-color: rgba(248, 113, 113, 0.55);
+}
+
+.ed-cal-pop {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 260px;
+    background: #0d1a26;
+    border: 1px solid #1e2d3d;
+    border-radius: 12px;
+    padding: 14px;
+    z-index: 100;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: edFadeIn 0.15s ease;
+}
+
+.ed-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.ed-cal-head b {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #c9d8e8;
+    text-transform: capitalize;
+}
+
+.ed-cal-head button {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #1e2d3d;
+    background: transparent;
+    color: #7d97ac;
+    cursor: pointer;
     font-size: 14px;
+    line-height: 1;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.ed-cal-head button:hover {
+    border-color: #f59e42;
+    color: #f59e42;
+}
+
+.ed-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px 0;
+}
+
+.ed-cal-dow {
+    text-align: center;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #5a7a94;
+    padding-block: 4px;
+}
+
+.ed-cal-day {
+    height: 28px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: #c9d8e8;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.ed-cal-day:hover {
+    background: #142433;
+}
+
+.ed-cal-day.out {
+    color: #2c3e50;
+}
+
+.ed-cal-day.mid {
+    background: rgba(245, 158, 66, 0.14);
+    border-radius: 0;
+}
+
+.ed-cal-day.edge {
+    background: #f59e42;
+    color: #1a1209;
+    font-weight: 700;
+}
+
+.ed-cal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #1e2d3d;
+}
+
+.ed-cal-chip {
+    font-size: 11px;
+    font-weight: 600;
+    color: #c9d8e8;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ed-cal-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ed-cal-clear {
+    background: none;
+    border: none;
+    color: #7d97ac;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.ed-cal-clear:hover {
+    color: #f87171;
+}
+
+.ed-cal-confirm {
+    background: #f59e42;
+    border: none;
+    border-radius: 6px;
+    color: #1a1209;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.ed-cal-confirm:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* ─── Tabs Editor ─── */

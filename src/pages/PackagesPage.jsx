@@ -80,6 +80,38 @@ function normalize(p) {
 const countHotels = (categories) =>
   (categories || []).reduce((n, cat) => n + (cat.hotels?.length || 0), 0);
 
+// Departure dates are "DD/MM" strings (see marketing/dates.js) — the card
+// shows which months have a departure rather than every individual date
+// range, which stopped fitting once a package had more than a couple.
+const MONTH_NAMES_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+const departureMonths = (dates) => {
+  const months = new Set();
+  (dates || []).forEach((d) => {
+    const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(d?.from || "").trim());
+    if (m) months.add(Number(m[2]));
+  });
+  return [...months].sort((a, b) => a - b).map((m) => MONTH_NAMES_FR[m - 1]);
+};
+
+// Pictograms for what's included — detected from the package's own "Offre
+// comprend"-style sections rather than shown unconditionally, so a
+// land-only package (no flight) doesn't claim one it doesn't have.
+const INCLUDE_PICTOS = [
+  { key: "flight", match: /\bvols?\b|avion|billet/i, icon: "ti-plane", label: "Vol inclus" },
+  { key: "hotel", match: /hôtel|hotel|logement|nuit/i, icon: "ti-bed", label: "Hôtel inclus" },
+  { key: "transfer", match: /transfert|navette/i, icon: "ti-car", label: "Transfert inclus" },
+];
+const includedPictos = (data) => {
+  // Two shapes exist in the wild: the current package editor's
+  // data.sections[].items, and the older flat data.includes (still what
+  // IncludesTab/normalize's airline extraction read) — check both so
+  // detection works regardless of which one a given package has.
+  const sectionItems = (data?.sections || []).flatMap((s) => s.items || []);
+  const flatItems = Array.isArray(data?.includes) ? data.includes : [];
+  const text = [...sectionItems, ...flatItems].map((i) => i.text || "").join(" ");
+  return INCLUDE_PICTOS.filter((p) => p.match.test(text));
+};
+
 const CATEGORY_META = {
   summer: { label: "Summer", color: "#0ea5e9", bg: "#eff6ff", text: "#0369a1" },
   luxury: { label: "Luxury", color: "#d97706", bg: "#fef3c7", text: "#92400e" },
@@ -727,6 +759,7 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
             </div>
           </div>
           <div className="pkg-card-price">
+            <div className="pkg-card-price-from">À partir de</div>
             <div className="pkg-card-price-value">{pkg.basePrice?.toLocaleString("fr-MA")}</div>
             <div className="pkg-card-price-unit">{pkg.currency || "DH"}/pers.</div>
           </div>
@@ -741,8 +774,8 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
 
         <div className="pkg-card-meta">
           {[
-            { icon: "ti-world", label: pkg.continent },
-            { icon: "ti-map-pin", label: pkg.country },
+            { icon: "ti-world", label: pkg.country },
+            { icon: "ti-map-pin", label: pkg._destination || pkg.title },
             { icon: "ti-calendar", label: `${pkg.data.departureDates.length} départ${pkg.data.departureDates.length !== 1 ? "s" : ""}` },
             { icon: "ti-bed", label: (() => { const n = countHotels(pkg.data.hotelCategories); return `${n} hôtel${n !== 1 ? "s" : ""}`; })() },
           ].map((m, i) => (
@@ -753,14 +786,21 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
           ))}
         </div>
 
-        {pkg.data?.departureDates.length > 0 && (
-          <div className="pkg-card-dates">
-            {pkg.data.departureDates.slice(0, 3).map(d => (
-              <span key={d.id} className="pkg-tag">{d.from} → {d.to}</span>
+        {includedPictos(pkg.data).length > 0 && (
+          <div className="pkg-card-includes">
+            {includedPictos(pkg.data).map((p) => (
+              <span key={p.key} className="pkg-card-picto" title={p.label}>
+                <i className={`ti ${p.icon}`} aria-hidden="true" /> {p.label.replace(" inclus", "")}
+              </span>
             ))}
-            {pkg.data.departureDates.length > 3 && (
-              <span className="pkg-tag" style={{ background: "rgba(255,117,14,0.1)", color: "#ff750e", borderColor: "transparent" }}>+{pkg.data.departureDates.length - 3}</span>
-            )}
+          </div>
+        )}
+
+        {departureMonths(pkg.data?.departureDates).length > 0 && (
+          <div className="pkg-card-dates">
+            {departureMonths(pkg.data.departureDates).map((m) => (
+              <span key={m} className="pkg-tag">{m}</span>
+            ))}
           </div>
         )}
 
@@ -880,8 +920,6 @@ function DetailPanel({ pkg, onClose, onDelete, onEdit, onTranslate, translating 
               <span className="pkg-badge" style={{ background: st.bg, color: st.text, marginBottom: 4 }}>
                 <span className="pkg-badge-dot" style={{ background: st.dot }} />{st.label}
               </span>
-              <div><i className="ti ti-clock" aria-hidden="true" />{pkg.data?.periodLabel}</div>
-              <div><i className="ti ti-calendar" aria-hidden="true" />{pkg.data?.durationLabel}</div>
             </div>
           </div>
         </div>
@@ -918,12 +956,23 @@ function DetailPanel({ pkg, onClose, onDelete, onEdit, onTranslate, translating 
 }
 
 function OverviewTab({ pkg }) {
+  const pictos = includedPictos(pkg.data);
   return (
     <div>
+      {pictos.length > 0 && (
+        <div className="pkg-card-includes" style={{ marginBottom: 16 }}>
+          {pictos.map((p) => (
+            <span key={p.key} className="pkg-card-picto" title={p.label}>
+              <i className={`ti ${p.icon}`} aria-hidden="true" /> {p.label.replace(" inclus", "")}
+            </span>
+          ))}
+        </div>
+      )}
+
       <Section title="Informations générales">
         {[
-          { icon: "ti-map-pin", label: "Destination", value: `${pkg.country ? ` · ${pkg.country}` : ""}` },
-          { icon: "ti-world", label: "Continent", value: pkg.continent },
+          { icon: "ti-map-pin", label: "Ville(s)", value: pkg._destination || pkg.title },
+          { icon: "ti-world", label: "Pays", value: pkg.country },
           { icon: "ti-id", label: "Référence", value: String(pkg.$id) },
           {
             icon: "ti-calendar-event",
