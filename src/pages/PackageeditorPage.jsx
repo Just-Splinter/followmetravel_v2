@@ -7,7 +7,7 @@ import { daysInMonth, parseDDMM, formatDDMM } from "../marketing/dates";
 import HotelPicker from "../components/HotelPicker";
 import { useClickOutside } from "../components/ClickOutSide";
 import StorageService from "../services/storage";
-import { ROOM_TYPES } from "../services/roomTypes";
+import { roomTypesFor } from "../services/roomTypes";
 import { useHotels } from "../context/HotelsContext";
 import { toast } from "react-toastify";
 import {
@@ -872,13 +872,15 @@ const priceColStart = 4;
  * Per-package room allotment for one hotel row — the same physical hotel
  * can be pooled differently across packages, so this lives on the hotel row
  * itself (package data), not on the shared hotel catalog. `allotment` is a
- * plain array parallel to `hotel.cols`/ROOM_TYPES[].colIdx, only shown for
- * room types this row actually prices (cols[colIdx] > 0) — matches how
- * BookingFlow reads cols by fixed index regardless of column header text.
+ * plain array parallel to `hotel.cols`, only shown for room types this row
+ * actually prices (cols[colIdx] > 0). The columns themselves come from
+ * roomTypesFor(category) — the same helper BookingFlow uses — so the labels
+ * shown here are exactly the `rooms[].type` strings a reservation will carry,
+ * including custom columns ("Baby 1-2"), and dispo tracking matches 1:1.
  */
-function HotelAllotmentRow({ hotel, headers, packageId, getBooked, onUpdateFields }) {
+function HotelAllotmentRow({ hotel, roomTypes, packageId, getBooked, onUpdateFields }) {
   const allotment = hotel.allotment || [];
-  const types = ROOM_TYPES.filter((rt) => Number(hotel.cols?.[rt.colIdx]) > 0);
+  const types = roomTypes.filter((rt) => Number(hotel.cols?.[rt.colIdx]) > 0);
   if (!types.length) return null;
 
   const updateAllotment = (colIdx, total) => {
@@ -890,16 +892,9 @@ function HotelAllotmentRow({ hotel, headers, packageId, getBooked, onUpdateField
   return (
     <div className="ed-hotel-avail-row">
       {types.map((rt) => {
-        // Display label follows the formule's actual column header (which
-        // "surcharge from hotel" may have overridden), but getBooked() below
-        // still keys off rt.label — the fixed Triple/Double/Single/2–5 ans
-        // vocabulary is what BookingFlow actually writes onto a reservation.
-        // A hotel with very different room names won't match dispo tracking
-        // 1:1 — the trade-off of overriding column text only, not the
-        // underlying position-based type system.
-        const label = headers?.[priceColStart + rt.colIdx] || rt.label;
+        const label = rt.label;
         const total = Number(allotment[rt.colIdx]) || 0;
-        const booked = hotel.hotelId && packageId ? getBooked(hotel.hotelId, packageId, rt.label) : 0;
+        const booked = hotel.hotelId && packageId ? getBooked(hotel.hotelId, packageId, label) : 0;
         const over = total > 0 && booked > total;
         return (
           <div key={rt.key} className="ed-hotel-avail-item">
@@ -934,6 +929,7 @@ function HotelAllotmentRow({ hotel, headers, packageId, getBooked, onUpdateField
 function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, onUpdateFields, onRemove, isOnly }) {
   const headers = category.tableHeaders || [];
   const hotels = category.hotels || [];
+  const catRoomTypes = roomTypesFor(category);
   const totalNights = hotelCategoryNights(category);
   const { getBooked } = useHotels();
 
@@ -1112,7 +1108,7 @@ function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, on
               {hotel.hotelId ? (
                 <HotelAllotmentRow
                   hotel={hotel}
-                  headers={headers}
+                  roomTypes={catRoomTypes}
                   packageId={packageId}
                   getBooked={getBooked}
                   onUpdateFields={(fields) => updateHotelFields(hotel.id, fields)}

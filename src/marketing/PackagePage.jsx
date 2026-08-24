@@ -15,6 +15,7 @@ import GeoMap from "./GeoMap";
 import { resolvePlace } from "./geo";
 import { localizeData } from "../services/translate";
 import { usePageMeta } from "./usePageMeta";
+import { roomTypesFor } from "../services/roomTypes";
 import "./marketing.css";
 
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -293,6 +294,9 @@ export default function PackagePage({ previewDoc = null }) {
   }
 
   const priceFrom = pkg.basePrice || parsePrice(cats[0]?.basePrice);
+  // Same derivation the booking wizard uses, so the price sheet and the
+  // steppers can never show a different set of room columns.
+  const catRoomTypes = roomTypesFor(cats[catTab]);
   let chapN = 0;
 
   /* The package's long description. `description` is the editor's dedicated
@@ -494,7 +498,9 @@ export default function PackagePage({ previewDoc = null }) {
                           <thead>
                             <tr>
                               {(cats[catTab].tableHeaders || ["Hôtel", "Ville", "Nuits", "★"]).slice(0, 4).map((h) => <th key={h}>{h}</th>)}
-                              <th>Triple</th><th>Double</th><th>Single</th><th>2–5 ans</th>
+                              {/* Price columns come from the formule itself, so a custom
+                                  room type added in the editor ("Baby 1-2") shows up here. */}
+                              {catRoomTypes.map((rt) => <th key={rt.key}>{rt.label}</th>)}
                             </tr>
                           </thead>
                           <tbody>
@@ -504,11 +510,11 @@ export default function PackagePage({ previewDoc = null }) {
                                 <td>{h.city || "—"}</td>
                                 <td>{h.nights || "—"}</td>
                                 <td>{h.stars ? `${h.stars}★` : "—"}</td>
-                                {[0, 1, 2, 3].map((c) => (
-                                  <td key={c} className="mk-pk-price-cell">
-                                    {parsePrice(h.cols?.[c]) ? (
+                                {catRoomTypes.map((rt) => (
+                                  <td key={rt.key} className="mk-pk-price-cell">
+                                    {parsePrice(h.cols?.[rt.colIdx]) ? (
                                       <>
-                                        {nf.format(parsePrice(h.cols[c]))}
+                                        {nf.format(parsePrice(h.cols[rt.colIdx]))}
                                         <em className="mk-pk-price-pp">{t("sr_per_person")}</em>
                                       </>
                                     ) : "—"}
