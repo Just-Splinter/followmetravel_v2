@@ -3,7 +3,7 @@ import { Modal } from "../components/UI";
 import PackageEditorPage from "./PackageeditorPage";
 import { usePackages } from "../context/PackagesContext";
 import { useHotels } from "../context/HotelsContext";
-import { ROOM_TYPES } from "../services/roomTypes";
+import { roomTypesFor } from "../services/roomTypes";
 import CreatePackageModal from "../components/CreatePackageModal";
 import { TravelDataProvider } from "../context/TravelDataContext";
 import { useClickOutside } from "../components/ClickOutSide";
@@ -1105,6 +1105,7 @@ function HotelsTab({ pkg }) {
         const colCount = hotels[0]?.cols?.length || 0;
         const headers = cat.tableHeaders || [];
         const colHeaders = colCount ? headers.slice(headers.length - colCount) : [];
+        const catRoomTypes = roomTypesFor(cat);
         const title = cat.label
           ? `${cat.label} — ${hotels.length} hôtel${hotels.length !== 1 ? "s" : ""}`
           : `${hotels.length} hôtel${hotels.length !== 1 ? "s" : ""} disponible${hotels.length !== 1 ? "s" : ""}`;
@@ -1128,7 +1129,10 @@ function HotelsTab({ pkg }) {
                 {h.cols && h.cols.length > 0 && (
                   <div className="pkg-hotel-cols" style={{ gridTemplateColumns: `repeat(${colHeaders.length}, 1fr)` }}>
                     {colHeaders.map((col, ci) => {
-                      const rt = ROOM_TYPES.find(t => t.colIdx === ci);
+                      // Availability is keyed by the column's own label — the
+                      // same string BookingFlow writes onto a reservation —
+                      // so custom columns ("Baby 1-2") track too.
+                      const rt = catRoomTypes[ci];
                       const total = rt ? Number(h.allotment?.[rt.colIdx]) || 0 : 0;
                       const booked = total > 0 && h.hotelId ? getBooked(h.hotelId, pkg.$id, rt.label) : null;
                       return (

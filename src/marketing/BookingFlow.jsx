@@ -5,7 +5,7 @@ import { useReservation } from "../context/ReservationContext";
 import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
 import { upcomingDepartures } from "./dates";
-import { ROOM_TYPES } from "../services/roomTypes";
+import { roomTypesFor } from "../services/roomTypes";
 import db, { Collections } from "../services/database";
 import { parseBookedSnapshot } from "../context/HotelsContext";
 
@@ -35,11 +35,14 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
        untouched editor-template data on old documents — never trusted here) */
   const categories = useMemo(() => pkg.hotelCategories ?? [], [pkg]);
 
+  // Room columns are whatever the formule actually prices — including custom
+  // ones the admin added in the editor ("Baby 1-2") — never a fixed four.
   const hasPricedRooms = useMemo(
     () =>
-      categories.some((c) =>
-        (c.hotels || []).some((h) => ROOM_TYPES.some((rt) => parsePrice(h.cols?.[rt.colIdx]) > 0))
-      ),
+      categories.some((c) => {
+        const types = roomTypesFor(c);
+        return (c.hotels || []).some((h) => types.some((rt) => parsePrice(h.cols?.[rt.colIdx]) > 0));
+      }),
     [categories]
   );
   const perPerson = !hasPricedRooms;
@@ -107,6 +110,8 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
 
   const category = categories[catIdx] || null;
   const hotels = category?.hotels || [];
+  // Price columns of the selected formule, labelled from its own headers.
+  const roomTypes = useMemo(() => roomTypesFor(category), [category]);
   const dates = useMemo(() => upcomingDepartures(pkg.departureDates), [pkg.departureDates]);
   const suppList = pkg.suppliments?.length
     ? pkg.suppliments.map((s) => ({ key: s.key || s.label, label: s.label, pricePerPax: Number(s.pricePerPax) || 0 }))
@@ -150,7 +155,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
       if (!hotel) return;
       const lines = [];
       let hTotal = 0, hPax = 0;
-      ROOM_TYPES.forEach((rt) => {
+      roomTypes.forEach((rt) => {
         const qty = r[rt.key] || 0;
         if (qty <= 0) return;
         const price = parsePrice(hotel.cols?.[rt.colIdx]);
@@ -165,7 +170,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
       }
     });
     return { breakdown, baseTotal, totalPax };
-  }, [rooms, hotels, perPerson, ppPrice, pax]);
+  }, [rooms, hotels, roomTypes, perPerson, ppPrice, pax]);
 
   const suppTotal = suppList.reduce((a, s) => (supp[s.key] ? a + s.pricePerPax * totalPax : a), 0);
   const grandTotal = baseTotal + suppTotal;
@@ -405,7 +410,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
                       <i>{fmt(parsePrice(h.cols?.[0]))} <u>{t("bk_per_pax")}</u></i>
                     </summary>
                     <div className="mk-bk-roomgrid">
-                      {ROOM_TYPES.map((rt) => {
+                      {roomTypes.map((rt) => {
                         const price = parsePrice(h.cols?.[rt.colIdx]);
                         if (!price) return null;
                         const qty = sel[rt.key] || 0;

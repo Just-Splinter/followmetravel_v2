@@ -4,7 +4,7 @@ import { useHotels, wouldExceedCapacity } from "../context/HotelsContext";
 import HotelPicker from "./HotelPicker";
 import NewReservationModal from "./NewReservationModal";
 import db, { Collections } from "../services/database";
-import { ROOM_TYPES as ROOM_TYPES_FULL } from "../services/roomTypes";
+import { roomTypesFor } from "../services/roomTypes";
 import { sendTriggerEmail, buildReservationParams } from "../services/emailSender";
 import { useInjectStyles, STATUS_TRIGGER } from "../services/reservationShared";
 import {
@@ -511,15 +511,25 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
     return () => { alive = false; };
   }, [res?.packageId]);
 
-  const pkgHotelRow = (hotelId) => {
+  const pkgHotelEntry = (hotelId) => {
     if (!pkgDoc || !hotelId) return null;
     let data;
     try { data = typeof pkgDoc.data === "string" ? JSON.parse(pkgDoc.data) : pkgDoc.data; } catch { return null; }
     for (const cat of data?.hotelCategories || []) {
       const hit = (cat.hotels || []).find((h) => h.hotelId === hotelId);
-      if (hit) return hit;
+      if (hit) return { row: hit, cat };
     }
     return null;
+  };
+  const pkgHotelRow = (hotelId) => pkgHotelEntry(hotelId)?.row ?? null;
+
+  // A reservation's `rooms[].type` is the formule's own column label — which
+  // may be a custom one ("Baby 1-2"), not just the four classic types — so
+  // resolve the allotment column against that package's actual columns.
+  const pkgRoomType = (hotelId, type) => {
+    const entry = pkgHotelEntry(hotelId);
+    if (!entry) return null;
+    return roomTypesFor(entry.cat).find((rt) => rt.label === type) || null;
   };
 
   // This reservation's own currently-saved qty per hotelId/type — subtracted
@@ -663,6 +673,15 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
   const removeSupplement = (i) => setDraftSupplements(ss => ss.filter((_, idx) => idx !== i));
 
   const ROOM_TYPES = ["Single", "Double", "Triple", "Quadruple", "Suite"];
+
+  // The generic list above plus the columns this package's own formule
+  // actually prices — otherwise a custom type ("Baby 1-2") isn't in the
+  // options and the select renders blank / silently rewrites it on save.
+  const roomTypeOptions = (hotelId, current) => {
+    const entry = pkgHotelEntry(hotelId);
+    const fromPkg = entry ? roomTypesFor(entry.cat).map((rt) => rt.label) : [];
+    return [...new Set([...ROOM_TYPES, ...fromPkg, ...(current ? [current] : [])])];
+  };
 
   return (
     <Drawer open={open} onClose={onClose} title={res.packageTitle || "Réservation"} icon={Eye} width={780}>
@@ -827,7 +846,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
               const row = pkgHotelRow(h.hotelId);
               if (!row?.blockWhenFull) return false;
               return (h.rooms || []).some(r => {
-                const rt = ROOM_TYPES_FULL.find(t => t.label === r.type);
+                const rt = pkgRoomType(h.hotelId, r.type);
                 const total = rt && Number(row.allotment?.[rt.colIdx]) || 0;
                 if (!total) return false;
                 return wouldExceedCapacity({
@@ -877,7 +896,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
                       <label className="res-label" style={{ marginBottom: 8, display: "block" }}>Chambres</label>
                       {(h.rooms || []).map((r, ri) => {
                         const row = pkgHotelRow(h.hotelId);
-                        const rt = ROOM_TYPES_FULL.find(t => t.label === r.type);
+                        const rt = pkgRoomType(h.hotelId, r.type);
                         const total = row && rt ? Number(row.allotment?.[rt.colIdx]) || 0 : 0;
                         const tracked = total > 0;
                         const booked = tracked ? getBooked(h.hotelId, res.packageId, r.type) : null;
@@ -891,7 +910,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
                           <div key={ri}>
                             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: tracked ? 2 : 6 }}>
                               <select className="res-select" style={{ flex: 1 }} value={r.type || "Double"} onChange={e => updateRoom(hi, ri, "type", e.target.value)}>
-                                {ROOM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                {roomTypeOptions(h.hotelId, r.type).map(t => <option key={t} value={t}>{t}</option>)}
                               </select>
                               <input className="res-input" style={{ width: 70 }} type="number" min="1" value={r.qty ?? 1} onChange={e => updateRoom(hi, ri, "qty", e.target.value)} />
                               <button onClick={() => removeRoom(hi, ri)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4, display: "flex" }}>
