@@ -32,9 +32,9 @@ const VISION_MODELS = [
   env.VITE_PDF_INGEST_VISION_MODEL,
   "qwen/qwen2.5-vl-72b-instruct",
   "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
   "dots-studio/dots-3-note-preview:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free", // degrades beyond ~3 pages — last resort
 ].filter(Boolean);
 
 /** True when a key is configured — the import UI can hide itself otherwise. */
@@ -261,7 +261,9 @@ async function callModel(model, { text, images }, key) {
     body: JSON.stringify({
       model,
       temperature: 0,
-      max_tokens: 12000, // large hotel tables produce long outputs — avoid truncation
+      // large hotel tables produce long outputs, and free vision models may
+      // spend thousands of reasoning tokens before the JSON — avoid truncation
+      max_tokens: vision ? 32000 : 12000,
       // several free vision providers reject response_format — rely on the
       // tolerant JSON parse for those instead
       ...(vision ? {} : { response_format: { type: "json_object" } }),
