@@ -24,6 +24,9 @@ const TEXT_MODELS = [
   "z-ai/glm-5.2:free",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-31b-it:free",
+  "dots-studio/dots-3-note-preview:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
+  "poolside/laguna-s-2.1:free",
 ].filter(Boolean);
 
 // Used when the PDF has no text layer (pure scan): pages are rasterized
@@ -239,6 +242,11 @@ function parseModelJson(text) {
   }
 }
 
+// Hard client-side deadline per model call. Free-tier models legitimately
+// take minutes, but a stalled response (headers received, body never ends)
+// would otherwise hang `res.json()` forever with no error surface at all.
+const CALL_TIMEOUT_MS = 240_000;
+
 async function callModel(model, { text, images }, key) {
   const vision = images?.length > 0;
   const userContent = vision
@@ -252,13 +260,17 @@ async function callModel(model, { text, images }, key) {
         ...images.map((url) => ({ type: "image_url", image_url: { url } })),
       ]
     : text;
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      // aborts the request AND a stalled body stream — json() below rejects
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
       model,
       temperature: 0,
       // large hotel tables produce long outputs, and free vision models may
@@ -271,24 +283,55 @@ async function callModel(model, { text, images }, key) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userContent },
       ],
-    }),
-  });
-  const body = await res.json().catch(() => ({}));
+      }),
+    });
+  } catch (e) {
+    const timedOut = e?.name === "TimeoutError" || e?.name === "AbortError";
+    const err = new Error(
+      timedOut
+        ? `Délai dépassé (${Math.round(CALL_TIMEOUT_MS / 1000)}s) pour ${model}`
+        : `Erreur réseau : ${e?.message || e}`
+    );
+    err.nextModel = true;
+    throw err;
+  }
+  let body;
+  try {
+    body = await res.json();
+  } catch (e) {
+    // stalled/garbled body (incl. timeout abort mid-stream) — next model
+    const err = new Error(
+      e?.name === "TimeoutError" || e?.name === "AbortError"
+        ? `Réponse interrompue après ${Math.round(CALL_TIMEOUT_MS / 1000)}s (${model})`
+        : `Réponse illisible de ${model}`
+    );
+    err.nextModel = true;
+    throw err;
+  }
   const inner = body?.error?.code; // OpenRouter tunnels provider status here (200 + error body)
   if (!res.ok || inner) {
     const status = res.status !== 200 ? res.status : Number(inner) || 500;
     const msg = body?.error?.message || `HTTP ${status}`;
     const err = new Error(msg);
     // Try the next model on: unknown model (400/404), no credits (402),
-    // gated model (403), upstream rate-limit (429), provider outage (5xx).
+    // gated model (403), timeout (408), upstream rate-limit (429), and any
+    // provider outage (5xx, incl. OpenRouter's generic "Provider returned
+    // error"). Only true terminal errors (bad key…) stop the chain.
     err.nextModel =
-      [400, 402, 403, 404, 429, 502, 503].includes(status) ||
-      /model|not found|invalid|rate.?limit/i.test(msg);
-    err.retryAfter = status === 429 ? 5000 : 0;
+      status >= 500 ||
+      [400, 402, 403, 404, 408, 429].includes(status) ||
+      /model|not found|invalid|rate.?limit|provider/i.test(msg);
+    err.retryAfter = status === 429 || status >= 500 ? 5000 : 0;
     err.status = status;
     throw err;
   }
   const reply = body.choices?.[0]?.message?.content || "";
+  if (!reply.trim()) {
+    const err = new Error(`Réponse vide de ${model}`);
+    err.nextModel = true;
+    err.retryAfter = 1000;
+    throw err;
+  }
   let parsed;
   try {
     parsed = parseModelJson(reply);
@@ -328,9 +371,13 @@ export async function analyzePdf(content, { apiKey, models } = {}) {
   for (const model of chain) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        return await callModel(model, payload, key);
+        console.log(`[pdfIngest] ${model} — tentative ${attempt + 1}…`);
+        const result = await callModel(model, payload, key);
+        console.log(`[pdfIngest] ${model} — OK`);
+        return result;
       } catch (e) {
         lastErr = e;
+        console.warn(`[pdfIngest] ${model} — échec : ${e?.message || e}`);
         if (e.retryAfter && attempt === 0) {
           await sleep(e.retryAfter);
           continue;
@@ -340,7 +387,11 @@ export async function analyzePdf(content, { apiKey, models } = {}) {
     }
     if (!lastErr?.nextModel) break; // real failure — don't spam other models
   }
-  throw lastErr;
+  throw new Error(
+    lastErr?.nextModel
+      ? `Analyse IA impossible — tous les modèles ont échoué. Dernière erreur : ${lastErr.message}`
+      : `Analyse IA échouée : ${lastErr?.message || "erreur inconnue"}`
+  );
 }
 
 /** Backwards-compatible alias (text-only path). */
