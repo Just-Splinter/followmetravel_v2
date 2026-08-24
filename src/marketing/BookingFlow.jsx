@@ -396,7 +396,8 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
                   <details key={h.id ?? hIdx} className={`mk-bk-hotel ${active ? "is-active" : ""}`} open={active}>
                     <summary>
                       <div>
-                        <b>{h.name}</b>
+                        {/* DISPLAY ONLY — the payload still carries the raw h.name */}
+                        <b>{t("bk_hotel_label")} — {h.name}</b>
                         <span>
                           {h.city ? `${h.city} · ` : ""}{h.stars ? `${h.stars}★` : ""}
                           {h.nights ? ` · ${h.nights} ${Number(h.nights) > 1 ? t("cal_nights") : t("cal_night")}` : ""}
@@ -413,7 +414,8 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
                         return (
                           <div key={rt.key} className="mk-bk-room">
                             <div>
-                              <b>{rt.label}</b>
+                              {/* DISPLAY ONLY — rooms[].type stays rt.label verbatim */}
+                              <b>{t("bk_room_label")} {rt.label}</b>
                               <span>{fmt(price)} {t("bk_per_pax")} · {rt.paxPerRoom} {t("bk_room_per")}</span>
                               {full && qty === 0 && <em className="mk-bk-full">{t("bk_room_full")}</em>}
                             </div>
