@@ -4148,6 +4148,29 @@ body:has(.mk) .grecaptcha-badge {
   color: var(--ink);
   text-wrap: pretty;
 }
+/* per-day description — shown LAST in a leg, clamped, opens the modal */
+.mk .mk-pk-leg-desc {
+  display: block;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 16px 0 0;
+  text-align: start;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-width: 46ch;
+  cursor: pointer;
+}
+.mk .mk-pk-leg-desc.is-static {
+  cursor: default;
+}
+.mk .mk-pk-leg-desc .mk-pk-desc-more {
+  display: inline-flex;
+  margin-top: 8px;
+}
+
 .mk-pk-desc-more {
   display: inline-flex;
   align-items: center;

@@ -132,7 +132,7 @@ export default function PackagePage({ previewDoc = null }) {
   const [booking, setBooking] = useState(false);
   const [bookDateIdx, setBookDateIdx] = useState(null);
   const [lb, setLb] = useState(null);
-  const [descOpen, setDescOpen] = useState(false);
+  const [descModal, setDescModal] = useState(null); // {title, text} | null
   const [catTab, setCatTab] = useState(0);
   const [activeCh, setActiveCh] = useState(null);
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
@@ -435,6 +435,9 @@ export default function PackagePage({ previewDoc = null }) {
                     <ol className="mk-pk-route-legs">
                       {pkg.days.map((d, i) => {
                         const num = d.num || String(i + 1).padStart(2, "0");
+                        const dayTheme = String(d.theme || "").trim();
+                        const dayKicker = dayTheme && dayTheme.split(/\s+/).length <= 8 ? dayTheme : null;
+                        const dayDesc = dayTheme && !dayKicker ? clampWords(dayTheme) : null;
                         return (
                           <li key={d.id ?? i} className={`mk-pk-leg ${i % 2 ? "is-flip" : ""}`}>
                             <LegPath flip={i % 2 === 1} rtl={isRTL} />
@@ -442,7 +445,10 @@ export default function PackagePage({ previewDoc = null }) {
                             <Reveal className="mk-pk-leg-grid" delay={60}>
                               <div className="mk-pk-leg-body">
                                 <span className="mk-pk-leg-ghost" aria-hidden="true">{num}</span>
-                                {d.theme && <em className="mk-pk-leg-kicker">{d.theme}</em>}
+                                {/* Short themes are true kickers ("ARRIVÉE & INSTALLATION");
+                                    longer text is a day DESCRIPTION and renders LAST,
+                                    clamped, with the full text in the modal. */}
+                                {dayKicker && <em className="mk-pk-leg-kicker">{dayKicker}</em>}
                                 <h3>
                                   {d.title}
                                   {d.badge && <span className="mk-sr-chip">{d.badge}</span>}
@@ -457,6 +463,21 @@ export default function PackagePage({ previewDoc = null }) {
                                     ))}
                                   </ul>
                                 )}
+                                {dayDesc && (dayDesc.truncated ? (
+                                  <button
+                                    className="mk-pk-leg-desc"
+                                    onClick={() => setDescModal({ title: d.title, text: dayTheme })}
+                                    aria-haspopup="dialog"
+                                  >
+                                    <span>{dayDesc.text}</span>
+                                    <span className="mk-pk-desc-more">
+                                      {t("pk_desc_more")}
+                                      <Arrow size={12} />
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <p className="mk-pk-leg-desc is-static">{dayDesc.text}</p>
+                                ))}
                               </div>
                               {d.image && (
                                 <figure className="mk-pk-leg-fig">
@@ -566,7 +587,7 @@ export default function PackagePage({ previewDoc = null }) {
                   <span className="mk-eyebrow">{t("pk_desc_title")}</span>
                   <button
                     className="mk-pk-desc-teaser"
-                    onClick={() => setDescOpen(true)}
+                    onClick={() => setDescModal({ title: t("pk_desc_title"), text: descFull })}
                     aria-haspopup="dialog"
                   >
                     <span className="mk-pk-desc-clamp">{desc.text}</span>
@@ -620,12 +641,12 @@ export default function PackagePage({ previewDoc = null }) {
         />
       )}
 
-      {descOpen && desc && (
+      {descModal && (
         <DescModal
-          title={t("pk_desc_title")}
-          text={descFull}
+          title={descModal.title}
+          text={descModal.text}
           closeLabel={t("pk_desc_close")}
-          onClose={() => setDescOpen(false)}
+          onClose={() => setDescModal(null)}
         />
       )}
 
