@@ -3846,6 +3846,7 @@ body:has(.mk) .grecaptcha-badge {
   text-transform: uppercase;
   color: var(--ink-2);
   margin-bottom: 12px;
+  text-align: center;
 }
 [dir="rtl"] .mk-pk-sheet-cap {
   letter-spacing: 0;
@@ -3894,6 +3895,22 @@ body:has(.mk) .grecaptcha-badge {
 .mk-pk-price-cell {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* "par personne" suffix under every priced figure — sits on its own line so
+   the numbers stay aligned in fr/en/ar alike. */
+.mk-pk-price-pp {
+  display: block;
+  font-style: normal;
+  font-size: 10.5px;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+[dir="rtl"] .mk-pk-price-pp {
+  letter-spacing: 0;
+  font-size: 11.5px;
 }
 .mk-pk-tnote {
   font-size: 12.5px;
@@ -4094,6 +4111,125 @@ body:has(.mk) .grecaptcha-badge {
   color: rgba(255, 255, 255, 0.75);
   font-size: 12.5px;
   letter-spacing: 0.1em;
+}
+
+/* ─── Package description — the closing block of the reading column ─────── */
+.mk-pk-desc {
+  margin-top: 54px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line-soft);
+}
+.mk-pk-desc .mk-eyebrow {
+  display: block;
+  margin-bottom: 14px;
+}
+/* `.mk button {padding:0}` is an element reset — the two-class selector is
+   what actually lets these buttons keep their padding. */
+.mk .mk-pk-desc-teaser {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: #fffdf9;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 20px 22px;
+  cursor: pointer;
+  transition: border-color 250ms, background 250ms, transform 300ms var(--ease);
+}
+.mk .mk-pk-desc-teaser:hover {
+  border-color: var(--accent);
+  background: #fff;
+}
+.mk-pk-desc-clamp {
+  display: block;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.mk-pk-desc-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+[dir="rtl"] .mk-pk-desc-more {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12.5px;
+}
+[dir="rtl"] .mk-pk-desc-more svg {
+  transform: scaleX(-1);
+}
+
+.mk-pk-desc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  background: rgba(15, 12, 9, 0.44);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+@media (min-width: 900px) {
+  .mk-pk-desc-overlay {
+    align-items: center;
+    padding: 32px;
+  }
+}
+.mk-pk-desc-panel {
+  background: var(--paper);
+  width: 100%;
+  max-height: 88svh;
+  overflow-y: auto;
+  border-radius: 18px 18px 0 0;
+  padding: 22px 20px 30px;
+}
+@media (min-width: 900px) {
+  .mk-pk-desc-panel {
+    max-width: 660px;
+    border-radius: 14px;
+    padding: 28px 32px 34px;
+  }
+}
+.mk-pk-desc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mk-pk-desc-head h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.25;
+  margin: 0;
+}
+.mk .mk-pk-desc-close {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mk-pk-desc-full {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.72;
+  color: var(--ink-2);
+  text-wrap: pretty;
+  white-space: pre-line;
 }
 
 /* ─── Booking flow ──────────────────────────────────────────────────────── */
