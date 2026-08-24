@@ -19,6 +19,16 @@ import "./marketing.css";
 
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
 
+/* The package's long description is clamped to a hard maximum of 32 words in
+   the reading column; the full text lives in the modal below. */
+const DESC_WORD_CAP = 32;
+const clampWords = (text, cap = DESC_WORD_CAP) => {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  return words.length > cap
+    ? { text: `${words.slice(0, cap).join(" ")}…`, truncated: true }
+    : { text: words.join(" "), truncated: false };
+};
+
 /* ─── Route timeline leg — a dotted travel route meandering between days.
    Desktop path swings toward the plate side (the line dives behind the
    photo); mobile path hugs the leading edge. RTL mirrors both. ─────────── */
@@ -70,6 +80,28 @@ function Lightbox({ images, index, onClose, onMove }) {
   );
 }
 
+/* ─── Description modal — same overlay contract as Lightbox / BookingFlow:
+   overlay click, ✕, Escape, and a body scroll-lock while open. ──────────── */
+function DescModal({ title, text, closeLabel, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [onClose]);
+  return (
+    <div className="mk-pk-desc-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mk-pk-desc-panel" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="mk-pk-desc-head">
+          <h3>{title}</h3>
+          <button className="mk-pk-desc-close" onClick={onClose} aria-label={closeLabel}>✕</button>
+        </div>
+        <p className="mk-pk-desc-full">{text}</p>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Chapter header ─────────────────────────────────────────────────────── */
 function ChapHead({ n, title, badge }) {
   return (
@@ -99,6 +131,7 @@ export default function PackagePage({ previewDoc = null }) {
   const [booking, setBooking] = useState(false);
   const [bookDateIdx, setBookDateIdx] = useState(null);
   const [lb, setLb] = useState(null);
+  const [descOpen, setDescOpen] = useState(false);
   const [catTab, setCatTab] = useState(0);
   const [activeCh, setActiveCh] = useState(null);
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
@@ -262,6 +295,12 @@ export default function PackagePage({ previewDoc = null }) {
   const priceFrom = pkg.basePrice || parsePrice(cats[0]?.basePrice);
   let chapN = 0;
 
+  /* The package's long description. `description` is the editor's dedicated
+     long-text field; older documents only carry the hero `tagline` /
+     `subtitleItalic`, which is exactly the text the hero used to print. */
+  const descFull = String(pkg.description || pkg.tagline || pkg.subtitleItalic || "").trim();
+  const desc = descFull ? clampWords(descFull) : null;
+
   const specs = [
     pkg.durationLabel && { k: t("sr_duration"), v: pkg.durationLabel },
     pkg.periodLabel && { k: t("pk_period"), v: pkg.periodLabel },
@@ -300,9 +339,8 @@ export default function PackagePage({ previewDoc = null }) {
 
           <div className="mk-wrap mk-pk-hero2-stage">
             <div className="mk-pk-hero2-left">
-              {(pkg.tagline || pkg.subtitleItalic) && (
-                <p className="mk-pk-hero2-tag">{pkg.tagline || pkg.subtitleItalic}</p>
-              )}
+              {/* the long description now closes the reading column — see
+                  `.mk-pk-desc` at the end of `.mk-pk-read` */}
               <dl className="mk-pk-specs2">
                 {specs.map((r) => (
                   <div key={r.k}><dt>{r.k}</dt><dd>{r.v}</dd></div>
@@ -515,6 +553,24 @@ export default function PackagePage({ previewDoc = null }) {
                   />
                 </section>
               )}
+
+              {/* Description — always the last block of the reading column */}
+              {desc && (
+                <section className="mk-pk-desc">
+                  <span className="mk-eyebrow">{t("pk_desc_title")}</span>
+                  <button
+                    className="mk-pk-desc-teaser"
+                    onClick={() => setDescOpen(true)}
+                    aria-haspopup="dialog"
+                  >
+                    <span className="mk-pk-desc-clamp">{desc.text}</span>
+                    <span className="mk-pk-desc-more">
+                      {t("pk_desc_more")}
+                      <Arrow size={12} />
+                    </span>
+                  </button>
+                </section>
+              )}
             </div>
           </div>
         </div>
@@ -555,6 +611,15 @@ export default function PackagePage({ previewDoc = null }) {
           index={lb}
           onClose={() => setLb(null)}
           onMove={(d) => setLb((i) => (i + d + images.length) % images.length)}
+        />
+      )}
+
+      {descOpen && desc && (
+        <DescModal
+          title={t("pk_desc_title")}
+          text={descFull}
+          closeLabel={t("pk_desc_close")}
+          onClose={() => setDescOpen(false)}
         />
       )}
 

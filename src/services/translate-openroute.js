@@ -22,6 +22,7 @@ export const translationConfigured = () => !!API_KEY;
 const TOP_FIELDS = [
   "destination",
   "destinationAccent",
+  "description",
   "tagline",
   "subtitleItalic",
   "durationLabel",

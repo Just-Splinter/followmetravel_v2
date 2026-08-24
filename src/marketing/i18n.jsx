@@ -325,6 +325,9 @@ const DICT = {
     pk_scroll: "Défiler",
     pk_edition: "Édition",
     pk_map: "Localisation",
+    pk_desc_title: "À propos de ce voyage",
+    pk_desc_more: "Lire la description complète",
+    pk_desc_close: "Fermer la description",
     subjects: ["Demande de réservation", "Modification de voyage", "Annulation", "Demande de devis", "Autre"],
   },
 
@@ -650,6 +653,9 @@ const DICT = {
     pk_scroll: "Scroll",
     pk_edition: "Edition",
     pk_map: "Location",
+    pk_desc_title: "About this trip",
+    pk_desc_more: "Read the full description",
+    pk_desc_close: "Close the description",
     subjects: ["Booking request", "Trip modification", "Cancellation", "Quote request", "Other"],
   },
 
@@ -975,6 +981,9 @@ const DICT = {
     pk_scroll: "مرر",
     pk_edition: "إصدار",
     pk_map: "الموقع",
+    pk_desc_title: "عن هذه الرحلة",
+    pk_desc_more: "قراءة الوصف الكامل",
+    pk_desc_close: "إغلاق الوصف",
     subjects: ["طلب حجز", "تعديل رحلة", "إلغاء", "طلب عرض سعر", "أخرى"],
   },
 };
