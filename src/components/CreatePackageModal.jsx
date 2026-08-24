@@ -132,7 +132,22 @@ function PdfImportSection({ importer }) {
   const inputRef = useRef(null);
   const { state, startImport, approveItem, applyImport, reset } = importer;
 
-  if (!pdfIngestConfigured()) return null;
+  // No key at build time (e.g. the Appwrite Sites build has no
+  // OPENROUTER_API_KEY env var): show a disabled, self-explanatory button
+  // instead of silently hiding the feature.
+  if (!pdfIngestConfigured()) {
+    return (
+      <div style={SI.wrap}>
+        <button style={{ ...SI.importBtn, opacity: 0.55, cursor: "not-allowed" }} disabled>
+          <i className="ti ti-file-type-pdf" style={{ fontSize: 16 }} />
+          Importer depuis un PDF
+          <span style={SI.importHint}>
+            Indisponible — ajoutez OPENROUTER_API_KEY aux variables d'environnement du site, puis redéployez
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   const stageIdx = IMPORT_STAGES.findIndex(s => s.key === state.stage);
   const pendingCount = state.missing.filter(m => !m.approved).length;
