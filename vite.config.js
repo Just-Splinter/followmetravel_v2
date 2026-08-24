@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -13,5 +14,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
+    // pdfIngest.test.js uses node:test (run: node --test src/services/pdfIngest.test.js)
+    exclude: [...configDefaults.exclude, '**/pdfIngest.test.js'],
   },
 })
