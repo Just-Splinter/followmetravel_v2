@@ -6,7 +6,7 @@ import { LangSwitcher } from "./ui";
 
 export default function Header({ light = false }) {
   const { t } = useLocale();
-  const { user, loading, loginWithGoogle, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [solid, setSolid] = useState(false);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export default function Header({ light = false }) {
   const authLabel = loading ? "…" : user ? (user.name || user.email).split(/[ @]/)[0] : t("nav_signin");
   const onAuth = () => {
     if (loading) return;
-    if (!user) loginWithGoogle();
+    if (!user) navigate("/login");
     else navigate("/profil#reservations");
   };
 
