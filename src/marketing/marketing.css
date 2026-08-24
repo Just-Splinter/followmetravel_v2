@@ -3846,6 +3846,7 @@ body:has(.mk) .grecaptcha-badge {
   text-transform: uppercase;
   color: var(--ink-2);
   margin-bottom: 12px;
+  text-align: center;
 }
 [dir="rtl"] .mk-pk-sheet-cap {
   letter-spacing: 0;
@@ -3894,6 +3895,22 @@ body:has(.mk) .grecaptcha-badge {
 .mk-pk-price-cell {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* "par personne" suffix under every priced figure — sits on its own line so
+   the numbers stay aligned in fr/en/ar alike. */
+.mk-pk-price-pp {
+  display: block;
+  font-style: normal;
+  font-size: 10.5px;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+[dir="rtl"] .mk-pk-price-pp {
+  letter-spacing: 0;
+  font-size: 11.5px;
 }
 .mk-pk-tnote {
   font-size: 12.5px;

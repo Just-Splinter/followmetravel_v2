@@ -468,7 +468,12 @@ export default function PackagePage({ previewDoc = null }) {
                                 <td>{h.stars ? `${h.stars}★` : "—"}</td>
                                 {[0, 1, 2, 3].map((c) => (
                                   <td key={c} className="mk-pk-price-cell">
-                                    {parsePrice(h.cols?.[c]) ? nf.format(parsePrice(h.cols[c])) : "—"}
+                                    {parsePrice(h.cols?.[c]) ? (
+                                      <>
+                                        {nf.format(parsePrice(h.cols[c]))}
+                                        <em className="mk-pk-price-pp">{t("sr_per_person")}</em>
+                                      </>
+                                    ) : "—"}
                                   </td>
                                 ))}
                               </tr>
