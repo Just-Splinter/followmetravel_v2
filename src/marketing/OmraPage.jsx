@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
-import { RECAPTCHA_SITE_KEY } from "../services/recaptcha";
 import { useTravelData } from "../context/TravelDataContext";
 import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
 import { omraFromPackages, omraYear } from "../services/omra";
 import Header from "./Header";
 import { Footer } from "./Sections";
-import { Reveal } from "./ui";
-import OmraBooking from "./OmraBooking";
+import { Reveal, Arrow } from "./ui";
 import { usePageMeta } from "./usePageMeta";
+import { breadcrumbJsonLd } from "./seo";
 import "./marketing.css";
 import "./omra.css";
+
+const OMRA_LD = breadcrumbJsonLd([["Accueil", "/"], ["Omra", "/omra"]]);
 
 /* ─── Ornaments ──────────────────────────────────────────────────────────── */
 
@@ -161,13 +161,17 @@ export default function OmraPage() {
   const { packages } = useTravelData();
   const navigate = useNavigate();
   const { trackReserve } = useEvents();
-  const [booking, setBooking] = useState(null); // omra pkg being booked
 
-  usePageMeta("Omra", t("footer_tag"));
+  const metaYear = omraYear(omraFromPackages(packages));
+  usePageMeta(t("om_meta_title").replace("{year}", metaYear), t("om_meta_desc").replace("{year}", metaYear), {
+    path: "/omra",
+    image: "/omra/hero-makkah.jpg",
+    jsonLd: OMRA_LD,
+  });
 
   const openBooking = (o) => {
     trackReserve({ targetId: o.$id ?? o.id, label: o.title, page: "/omra" });
-    setBooking(o);
+    navigate(`/omra/reserver/${encodeURIComponent(o.$id ?? o.id)}`);
   };
 
   // starfield depth — two layers drift gently with the cursor
@@ -222,6 +226,13 @@ export default function OmraPage() {
     { k: "ziyarat", label: t("om_inc_ziyarat") },
   ];
 
+  // Carte « Prochain départ » du hero : premier forfait publié, sa première date, son prix « dès ».
+  const next = list[0] || null;
+  const nextDate = next ? (next.dates || []).find((d) => d.from) : null;
+  const nextPrice = next
+    ? Math.min(...(next.pricing || []).map((p) => Number(p.price)).filter((n) => n > 0), Infinity)
+    : Infinity;
+
   const goPacks = () =>
     document.getElementById("om-forfaits")?.scrollIntoView({ behavior: "smooth" });
 
@@ -243,22 +254,49 @@ export default function OmraPage() {
             <circle cx="50" cy="50" r="33.9" stroke="currentColor" strokeWidth="0.2" />
             <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="0.2" strokeDasharray="0.2 1.8" />
           </svg>
-          <div className="om-hero-in">
-            <span className="om-kicker">{t("om_eyebrow")}</span>
-            <span className="om-mask">
-              <p className="om-talbiyah" lang="ar">
-                لَبَّيْكَ اللَّهُمَّ لَبَّيْك
-              </p>
-            </span>
-            <OmDivider />
-            <h1 className="om-hero-title">
-              {t("om_title")} {year}
-            </h1>
-            <p className="om-hero-sub">{t("om_sub")}</p>
-          </div>
-          <div className="om-hero-cue" aria-hidden="true">
-            <span>{t("om_scroll")}</span>
-            <i />
+          <div className="om-wrap om-hero-grid">
+            <div className="om-hero-in">
+              <span className="om-kicker">{t("om_eyebrow")}</span>
+              <span className="om-mask">
+                <p className="om-talbiyah" lang="ar">
+                  لَبَّيْكَ اللَّهُمَّ لَبَّيْك
+                </p>
+              </span>
+              <OmDivider />
+              <h1 className="om-hero-title">
+                {t("om_title")} {year}
+              </h1>
+              <p className="om-hero-sub">{t("om_sub")}</p>
+              <div className="om-cta-row om-hero-actions">
+                <button className="om-cta-gold" onClick={goPacks}>{t("om_cta_book")}</button>
+                <button className="om-cta-ghost" onClick={() => navigate("/contact")}>{t("om_cta_contact")}</button>
+              </div>
+            </div>
+
+            {next && (
+              <button className="om-hero-card" onClick={() => openBooking(next)}>
+                <span className="om-kicker">{t("trips_next")}</span>
+                <b className="om-hero-card-ttl">{next.title}</b>
+                {next.titleAr && <em lang="ar">{next.titleAr}</em>}
+                {nextDate && (
+                  <span className="om-hero-card-date">
+                    {nextDate.from} → {nextDate.to}{nextDate.label ? ` · ${nextDate.label}` : ""}
+                  </span>
+                )}
+                <span className="om-hero-card-nights">
+                  <span><b>{next.nightsMakkah ?? "—"}</b> {t("om_pk_n_mk")}</span>
+                  <span><b>{next.nightsMadinah ?? "—"}</b> {t("om_pk_n_md")}</span>
+                </span>
+                <span className="om-hero-card-foot">
+                  <span>
+                    {Number.isFinite(nextPrice) && (
+                      <>{t("trips_from")} <b>{nf.format(nextPrice)} DH</b></>
+                    )}
+                  </span>
+                  <span className="mk-roundgo" aria-hidden="true"><Arrow size={14} /></span>
+                </span>
+              </button>
+            )}
           </div>
         </section>
 
@@ -275,6 +313,7 @@ export default function OmraPage() {
 
         {/* — Chapitre I : Makkah — */}
         <section className="om-chap om-chap--night" id="om-makkah">
+          <div className="om-wrap om-chap-grid">
           <Reveal className="om-chap-head">
             <OmThread />
             <span className="om-kicker">{t("om_mk_kicker")}</span>
@@ -282,7 +321,6 @@ export default function OmraPage() {
             <h2 className="om-chap-latin">{t("om_mk_title")}</h2>
             <p>{t("om_mk_text")}</p>
           </Reveal>
-          <div className="om-wrap">
             <Reveal className="om-arches" delay={80}>
               <ArchFig src="/omra/makkah-kiswa.jpg" latin={t("om_mk_cap1")} ar="الكِسْوَة" />
               <ArchFig src="/omra/makkah-tawaf.jpg" latin={t("om_mk_cap2")} ar="الطَّوَاف" />
@@ -309,6 +347,7 @@ export default function OmraPage() {
 
         {/* — Chapitre II : Madinah — */}
         <section className="om-chap om-chap--dawn" id="om-madinah">
+          <div className="om-wrap om-chap-grid om-chap-grid--rev">
           <Reveal className="om-chap-head">
             <OmThread />
             <span className="om-kicker" style={{ color: "var(--om-gold-deep)" }}>
@@ -318,11 +357,30 @@ export default function OmraPage() {
             <h2 className="om-chap-latin">{t("om_md_title")}</h2>
             <p>{t("om_md_text")}</p>
           </Reveal>
-          <div className="om-wrap">
             <Reveal className="om-arches" delay={80}>
               <ArchFig src="/omra/madinah-arcade.jpg" latin={t("om_md_cap1")} ar="السَّكِينَة" />
               <ArchFig src="/omra/madinah-dome.jpg" latin={t("om_md_cap2")} ar="الْقُبَّةُ الْخَضْرَاء" />
               <ArchFig src="/omra/madinah-interior.jpg" latin={t("om_md_cap3")} ar="الرَّوْضَة" />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* — Inclusions — */}
+        <section className="om-inc">
+          <div className="om-wrap">
+            <Reveal className="om-sec-head">
+              <span className="om-kicker" style={{ color: "var(--om-gold-deep)" }}>
+                {t("om_inc_kicker")}
+              </span>
+              <h2 className="om-chap-latin" style={{ marginTop: 14 }}>{t("om_inc_title")}</h2>
+            </Reveal>
+            <Reveal className="om-inc-grid" delay={80}>
+              {incs.map((inc) => (
+                <div className="om-inc-cell" key={inc.k}>
+                  <IncIcon k={inc.k} />
+                  <span>{inc.label}</span>
+                </div>
+              ))}
             </Reveal>
           </div>
         </section>
@@ -455,28 +513,10 @@ export default function OmraPage() {
           </div>
         </section>
 
-        {/* — Inclusions — */}
-        <section className="om-inc">
-          <div className="om-wrap">
-            <Reveal style={{ textAlign: "center" }}>
-              <span className="om-kicker" style={{ color: "var(--om-gold-deep)" }}>
-                {t("om_inc_kicker")}
-              </span>
-              <h2 className="om-chap-latin" style={{ marginTop: 14 }}>{t("om_inc_title")}</h2>
-            </Reveal>
-            <Reveal className="om-inc-grid" delay={80}>
-              {incs.map((inc) => (
-                <div className="om-inc-cell" key={inc.k}>
-                  <IncIcon k={inc.k} />
-                  <span>{inc.label}</span>
-                </div>
-              ))}
-            </Reveal>
-          </div>
-        </section>
-
         {/* — Le retour — */}
-        <section className="om-cta">
+        <section className="om-cta-sec">
+          <div className="om-wrap">
+          <div className="om-cta">
           <img src="/omra/madinah-court.jpg" alt="" loading="lazy" />
           <Reveal className="om-cta-in">
             <span className="om-word" lang="ar">رِحْلَةُ الْعُمْر</span>
@@ -489,15 +529,12 @@ export default function OmraPage() {
               </button>
             </div>
           </Reveal>
+          </div>
+          </div>
         </section>
       </main>
       <Footer />
 
-      {booking && (
-        <GoogleReCaptchaProvider reCaptchaKey={RECAPTCHA_SITE_KEY}>
-          <OmraBooking pkg={booking} onClose={() => setBooking(null)} />
-        </GoogleReCaptchaProvider>
-      )}
     </div>
   );
 }

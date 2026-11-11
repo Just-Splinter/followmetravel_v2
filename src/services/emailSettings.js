@@ -49,6 +49,18 @@ export const EMAIL_TRIGGERS = [
     audience: "client",
     hint: 'Envoyé au client quand le statut passe à "Terminée".',
   },
+  {
+    key: "payment_reminder",
+    label: "Rappel de paiement",
+    audience: "client",
+    hint: "Envoyé automatiquement chaque matin avant une échéance, puis en cas de retard (réglages dans Paramètres → Agence). Échéancier PDF joint.",
+  },
+  {
+    key: "booking_abandoned",
+    label: "Réservation non finalisée",
+    audience: "client",
+    hint: "Envoyé à la main depuis Relances, à un client connecté qui a abandonné sa réservation.",
+  },
 ];
 
 export function parseEmailSettings(doc) {

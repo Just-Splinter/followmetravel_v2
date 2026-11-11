@@ -33,11 +33,10 @@ async function uploadImage(blob, filename, maxW, quality) {
   return { fileId: res.$id, url: String(storage.getView(res.$id)) };
 }
 
-const isAuthError = (e) =>
-  e?.cause?.code === 401 || /not authorized|missing.*permission/i.test(e?.message || "");
+const isAuthError = (e) => e?.cause?.code === 401 || e?.cause?.code === 403;
 
 const AUTH_HINT =
-  "Écriture refusée par Appwrite : connectez-vous au dashboard (compte admin) puis réessayez.";
+  "Écriture refusée par le serveur : connectez-vous au dashboard (compte admin) puis réessayez.";
 
 // ─── Slide form modal ────────────────────────────────────────────────────────
 function SlideModal({ slide, onSave, onClose }) {
@@ -243,7 +242,7 @@ export default function HeroSlidesManager() {
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>Slides du hero (page d'accueil)</div>
           <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 2 }}>
-            Stockés dans la collection <code>products</code> (kind: hero-slide), images dans Appwrite Storage.
+            Stockés dans la collection <code>products</code> (kind: hero-slide), images dans le stockage de fichiers (MinIO).
           </div>
         </div>
         <button className="em-btn-secondary" onClick={importDefaults} disabled={!!importing}>
@@ -280,7 +279,7 @@ export default function HeroSlidesManager() {
               <span
                 className="cms-badge"
                 style={s.status === "draft"
-                  ? { background: "rgba(255,117,14,0.1)", color: "#c4733a" }
+                  ? { background: "rgba(255,117,14,0.1)", color: "#ff750e" }
                   : { background: "#f0fdf4", color: "#15803d" }}
               >
                 {s.status}

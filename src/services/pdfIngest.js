@@ -9,7 +9,22 @@
 //    predefined taxonomy (case/accent-insensitive) and assemble the final
 //    editor blob with ids and editor defaults.
 
-const env = (typeof import.meta !== "undefined" && import.meta.env) || {};
+// Each variable read explicitly: Vite inlines only `import.meta.env.X`
+// accesses. Referencing `import.meta.env` as a whole inlined the ENTIRE env
+// object (every VITE_*/OPENROUTER_* value, DeepSeek key included) into the
+// public bundle. The try keeps `node --test` working (no import.meta.env).
+function readEnv() {
+  try {
+    return {
+      OPENROUTER_API_KEY: import.meta.env.OPENROUTER_API_KEY,
+      VITE_PDF_INGEST_MODEL: import.meta.env.VITE_PDF_INGEST_MODEL,
+      VITE_PDF_INGEST_VISION_MODEL: import.meta.env.VITE_PDF_INGEST_VISION_MODEL,
+    };
+  } catch {
+    return {};
+  }
+}
+const env = readEnv();
 
 const API_KEY = env.OPENROUTER_API_KEY;
 const API_URL = "https://openrouter.ai/api/v1/chat/completions";

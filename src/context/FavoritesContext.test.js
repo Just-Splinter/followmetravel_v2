@@ -1,10 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../services/appwrite", () => ({
+vi.mock("../services/account", () => ({
   getPrefs: vi.fn(),
   updatePrefs: vi.fn(),
   account: {},
-  client: {},
 }));
 vi.mock("./AuthContext", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("./EventsContext", () => ({ useEvents: () => ({ trackFavorite: vi.fn() }) }));

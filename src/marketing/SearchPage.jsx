@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTravelData } from "../context/TravelDataContext";
-import { isHeroSlideDoc } from "../services/heroSlides";
-import { isOmraDoc } from "../services/omra";
-import { isContactDoc } from "../services/siteContact";
+import { isSiteDoc } from "../services/siteDocs";
 import { localizeData } from "../services/translate";
 import { useLocale } from "./i18n";
 import Header from "./Header";
@@ -14,7 +12,11 @@ import GeoMap from "./GeoMap";
 import { resolvePlace } from "./geo";
 import { useClickOutside } from "../components/ClickOutSide";
 import { usePageMeta } from "./usePageMeta";
+import { breadcrumbJsonLd, packageHref } from "./seo";
+import { useEvents } from "../context/EventsContext";
 import "./marketing.css";
+
+const SEARCH_LD = breadcrumbJsonLd([["Accueil", "/"], ["Voyages", "/search"]]);
 
 /* ─── Small icons ────────────────────────────────────────────────────────── */
 const Ico = {
@@ -57,13 +59,13 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
 
-  usePageMeta(t("search_title"), t("footer_tag"));
+  usePageMeta(t("search_meta_title"), t("search_meta_desc"), { path: "/search", jsonLd: SEARCH_LD });
 
   /* items */
   const items = useMemo(
     () =>
       (packages || [])
-        .filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p) && !isContactDoc(p))
+        .filter((p) => !isSiteDoc(p))
         .map((p) => {
           const d = localizeData(parse(p), locale);
           return {
@@ -79,7 +81,7 @@ export default function SearchPage() {
             formules: Array.isArray(d.hotelCategories) ? d.hotelCategories.length : 0,
             departureDates: d.departureDates || [],
             departures: Array.isArray(d.departureDates) ? d.departureDates.length : 0,
-            featured: p.status === "active",
+            featured: !!p.featured,
             tagline: d.tagline || d.subtitleItalic || "",
           };
         }),
@@ -93,11 +95,13 @@ export default function SearchPage() {
   }, [items]);
 
   /* filters */
-  const [view, setView] = useState("list");
+  const [view, setView] = useState("grid");
   const [sortBy, setSortBy] = useState("default");
   const [destId, setDestId] = useState(searchParams.get("dest") || "");
-  const [country, setCountry] = useState("");
+  const [country, setCountry] = useState(searchParams.get("country") || "");
   const [minRating, setMinRating] = useState(0);
+  // Aucun voyage noté : le tri et le filtre par note n'ont pas de sens, on les masque.
+  const hasRatings = items.some((i) => Number(i.rating) > 0);
   const [range, setRange] = useState(null); // [lo, hi] | null = full
   const [selAdv, setSelAdv] = useState(() => {
     const adv = searchParams.get("adventures");
@@ -191,6 +195,25 @@ export default function SearchPage() {
     return list;
   }, [items, destId, country, selAdv, lo, hi, minRating, sortBy, featuredOnly]);
 
+  // Recherche par filtres : ce que les visiteurs cherchent et, surtout, ce
+  // qu'ils ne trouvent pas (results: 0) — suivi après 1,5 s sans changement.
+  const { trackSearch } = useEvents();
+  const lastTracked = useRef("");
+  useEffect(() => {
+    if (loading) return;
+    const destName = destinations.find((d) => d.$id === destId)?.name;
+    const moods = adventures.filter((a) => selAdv[a.$id]).map((a) => a.name);
+    const parts = [destName, country, ...moods, range ? `${lo}-${hi} DH` : null].filter(Boolean);
+    if (!parts.length) return;
+    const label = parts.join(" · ");
+    const timer = setTimeout(() => {
+      if (label === lastTracked.current) return;
+      lastTracked.current = label;
+      trackSearch({ label, action: "filters", results: results.length });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [loading, destinations, adventures, destId, country, selAdv, range, lo, hi, results.length, trackSearch]);
+
   const pageSize = view === "list" ? 5 : view === "grid" ? 9 : 12;
   const pages = Math.max(1, Math.ceil(results.length / pageSize));
   const slice = results.slice((page - 1) * pageSize, page * pageSize);
@@ -205,14 +228,12 @@ export default function SearchPage() {
   };
 
   // carry the hero-form context (travellers, wished date) into the package page
-  const go = (id) => {
-    const qs = new URLSearchParams({ pkgId: id });
-    ["adults", "date"].forEach((k) => {
-      const v = searchParams.get(k);
-      if (v) qs.set(k, v);
-    });
-    navigate(`/packages/view?${qs.toString()}`);
-  };
+  const hrefOf = (it) => packageHref(it.id, it.title, { adults: searchParams.get("adults"), date: searchParams.get("date") });
+  const go = (it) => navigate(hrefOf(it));
+  // Titre en vrai lien (suivi par les moteurs) ; le clic reste géré par la carte.
+  const titleLink = (it) => (
+    <a href={hrefOf(it)} onClick={(e) => { e.preventDefault(); e.stopPropagation(); go(it); }}>{it.title}</a>
+  );
 
   /* ── sidebar ── */
   const sidebar = (
@@ -263,7 +284,7 @@ export default function SearchPage() {
       </section>
 
       <section className="mk-sr-block">
-        <h4>{t("sr_country")} · {t("flt_rating")}</h4>
+        <h4>{hasRatings ? `${t("sr_country")} · ${t("flt_rating")}` : t("sr_country")}</h4>
         <div className="mk-sr-selects">
           <div className="mk-sr-selectwrap">
             <select value={country} onChange={(e) => { setCountry(e.target.value); setPage(1); }}>
@@ -271,12 +292,14 @@ export default function SearchPage() {
               {countries.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="mk-sr-selectwrap">
-            <select value={minRating} onChange={(e) => { setMinRating(Number(e.target.value)); setPage(1); }}>
-              <option value={0}>{t("sort_rating")} — ★</option>
-              {[3, 4, 5].map((n) => <option key={n} value={n}>{n}★+</option>)}
-            </select>
-          </div>
+          {hasRatings && (
+            <div className="mk-sr-selectwrap">
+              <select value={minRating} onChange={(e) => { setMinRating(Number(e.target.value)); setPage(1); }}>
+                <option value={0}>{t("sort_rating")} — ★</option>
+                {[3, 4, 5].map((n) => <option key={n} value={n}>{n}★+</option>)}
+              </select>
+            </div>
+          )}
         </div>
       </section>
 
@@ -331,14 +354,14 @@ export default function SearchPage() {
 
   const ListCard = ({ it }) => (
     <article className="mk-sr-card">
-      <figure onClick={() => go(it.id)}>
+      <figure onClick={() => go(it)}>
         {it.img ? <img src={it.img} alt={it.title} loading="lazy" /> : <span className="mk-sr-imgfall">{it.title.charAt(0)}</span>}
         <FavoriteButton id={it.id} label={it.title} />
       </figure>
       <div className="mk-sr-card-body">
         <div className="mk-sr-card-head">
           <div>
-            <h3 onClick={() => go(it.id)}>{it.title}</h3>
+            <h3>{titleLink(it)}</h3>
             <div className="mk-sr-sub">
               <span>{it.country}</span>
               <Stars r={it.rating} />
@@ -352,40 +375,41 @@ export default function SearchPage() {
         </div>
         <Specs it={it} />
         <div className="mk-sr-actions">
-          <button className="mk-btn mk-btn--sm" onClick={() => go(it.id)}>{t("card_book")}</button>
-          <QuickPrice pkgId={it.id} price={it.price} departureDates={it.departureDates} compact />
+          <button className="mk-btn mk-btn--sm" onClick={() => go(it)}>{t("card_book")}</button>
+          <QuickPrice pkgId={it.id} title={it.title} price={it.price} departureDates={it.departureDates} compact />
         </div>
       </div>
     </article>
   );
 
   const GridCard = ({ it }) => (
-    <article className="mk-sr-gcard" onClick={() => go(it.id)}>
+    <article className="mk-sr-gcard" onClick={() => go(it)}>
       <figure>
         {it.img ? <img src={it.img} alt={it.title} loading="lazy" /> : <span className="mk-sr-imgfall">{it.title.charAt(0)}</span>}
+        <span className="mk-trip-shade" aria-hidden="true" />
         {it.featured && <span className="mk-sr-chip mk-sr-chip--accent">{t("sr_featured")}</span>}
         <FavoriteButton id={it.id} label={it.title} />
+        <h3>{titleLink(it)}</h3>
       </figure>
       <div className="mk-sr-gcard-meta">
-        <span>{it.country}</span>
+        <span>{[it.country, it.durationLabel].filter(Boolean).join(" · ")}</span>
         <Stars r={it.rating} />
       </div>
-      <h3>{it.title}</h3>
       <div className="mk-sr-gcard-foot">
         <Price it={it} />
         <span className="mk-sr-gcard-go"><Arrow size={14} /></span>
       </div>
       <div className="mk-sr-gcard-more">
-        <QuickPrice pkgId={it.id} price={it.price} departureDates={it.departureDates} compact />
+        <QuickPrice pkgId={it.id} title={it.title} price={it.price} departureDates={it.departureDates} compact />
       </div>
     </article>
   );
 
   const CompactRow = ({ it }) => (
-    <article className="mk-sr-row" onClick={() => go(it.id)}>
+    <article className="mk-sr-row" onClick={() => go(it)}>
       <figure>{it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mk-sr-imgfall">{it.title.charAt(0)}</span>}</figure>
       <div className="mk-sr-row-main">
-        <h3>{it.title}</h3>
+        <h3>{titleLink(it)}</h3>
         <span>{it.country}{it.durationLabel ? ` — ${it.durationLabel}` : ""}</span>
       </div>
       <Price it={it} />
@@ -416,7 +440,7 @@ export default function SearchPage() {
                 <option value="default">—</option>
                 <option value="price_asc">{t("sort_price_asc")}</option>
                 <option value="price_desc">{t("sort_price_desc")}</option>
-                <option value="rating">{t("sort_rating")}</option>
+                {hasRatings && <option value="rating">{t("sort_rating")}</option>}
                 <option value="name">{t("sort_name")}</option>
               </select>
             </div>

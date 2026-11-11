@@ -6,6 +6,7 @@ import HeroSlidesManager from "../components/HeroSlidesManager";
 import OmraManager from "../components/OmraManager";
 import ContactImagesManager from "../components/ContactImagesManager";
 import EmailNotificationsManager from "../components/EmailNotificationsManager";
+import AgencySettingsManager from "../components/AgencySettingsManager";
 import { parseHeroSlide } from "../services/heroSlides";
 import { parseOmra } from "../services/omra";
 import { emailSettingsFromPackages, EMAIL_TRIGGERS } from "../services/emailSettings";
@@ -15,6 +16,10 @@ import "../styles/TravelCMS.css";
 
 // ─── Schemas (unchanged logic, same as before) ──────────────────────────────
 const SCHEMAS = {
+  agency: {
+    label: "Agence", icon: "🏢", custom: true, dataKey: "packages",
+    countOf: () => 1,
+  },
   hero: {
     label: "Hero slide", icon: "🎬", custom: true, dataKey: "packages",
     countOf: (docs) => (docs || []).filter((d) => parseHeroSlide(d)).length,
@@ -103,7 +108,7 @@ const SCHEMAS = {
 const BADGE_COLORS = {
   published: { bg: "#f0fdf4", color: "#15803d" },
   active: { bg: "#f0fdf4", color: "#15803d" },
-  draft: { bg: "rgba(255,117,14,0.1)", color: "#c4733a" },
+  draft: { bg: "rgba(255,117,14,0.1)", color: "#ff750e" },
   inactive: { bg: "#fef2f2", color: "#dc2626" },
 };
 
@@ -322,7 +327,7 @@ export default function TravelCMS() {
           {ctx.error && <p className="cms-status-bar error">⚠ {ctx.error.message}</p>}
 
           {schema.custom ? (
-            col === "omra" ? <OmraManager /> : col === "contact" ? <ContactImagesManager /> : col === "notifications" ? <EmailNotificationsManager /> : <HeroSlidesManager />
+            col === "agency" ? <AgencySettingsManager /> : col === "omra" ? <OmraManager /> : col === "contact" ? <ContactImagesManager /> : col === "notifications" ? <EmailNotificationsManager /> : <HeroSlidesManager />
           ) : (
             <div className="cms-table-card">
 

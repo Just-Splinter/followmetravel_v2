@@ -4,11 +4,12 @@ import { useLocale } from "./i18n";
 import { useClickOutside } from "../components/ClickOutSide";
 import { upcomingDepartures } from "./dates";
 import RangeCalendar from "./RangeCalendar";
+import { packageHref } from "./seo";
 
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /** "Check price" — departure calendar dropdown on listing cards. */
-export default function QuickPrice({ pkgId, price, departureDates, compact = false }) {
+export default function QuickPrice({ pkgId, title, price, departureDates, compact = false }) {
   const { t, locale } = useLocale();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -19,9 +20,7 @@ export default function QuickPrice({ pkgId, price, departureDates, compact = fal
   const deps = upcomingDepartures(departureDates);
 
   const go = () => {
-    const qs = new URLSearchParams({ pkgId });
-    if (sel?.from) qs.set("date", iso(sel.from));
-    navigate(`/packages/view?${qs.toString()}`);
+    navigate(packageHref(pkgId, title, { date: sel?.from ? iso(sel.from) : "" }));
   };
 
   return (

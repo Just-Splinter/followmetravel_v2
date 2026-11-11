@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLocale } from "./i18n";
 import { Arrow } from "./ui";
 import { slideBg, slideCard } from "../services/heroSlides";
+import { FEW_SEATS, dayLabel } from "./homeData";
 import HeroFlow from "./HeroFlow";
 
 const HERO_MS = 6500;
@@ -12,7 +13,7 @@ const HERO_MS = 6500;
  * line-by-line under a mask, thin progress lines, swipe on touch.
  */
 export default function Hero({ slides }) {
-  const { t, isRTL } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const [active, setActive] = useState(0);
   const [textIn, setTextIn] = useState(true);
   const navigate = useNavigate();
@@ -87,6 +88,16 @@ export default function Hero({ slides }) {
   if (N === 0) return null;
   const s = slides[active];
   const pad = (n) => String(n).padStart(2, "0");
+  // Diapositive d'un package « À la une » : prix, prochain départ, places.
+  const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
+  const meta = s.pkg
+    ? [
+        s.pkg.price > 0 && `${t("trips_from")} ${nf.format(s.pkg.price)} DH`,
+        s.pkg.next && `${t("hero_next_dep")} ${dayLabel(s.pkg.next, locale, { day: "numeric", month: "long" })}`,
+        s.pkg.remaining !== null && s.pkg.remaining > 0 && s.pkg.remaining <= FEW_SEATS && `${s.pkg.remaining} ${t("dep_seats_left")}`,
+      ].filter(Boolean)
+    : [];
+  const href = s.href || "/search";
 
   return (
     <section
@@ -117,25 +128,31 @@ export default function Hero({ slides }) {
 
       <div className="mk-wrap mk-hero-in">
         <div className={`mk-hero-copy ${textIn ? "" : "is-leaving"}`}>
-          <span className="mk-eyebrow">{t("hero_eyebrow")}</span>
+          <h1 className="mk-eyebrow mk-hero-h1">{t("hero_eyebrow")}</h1>
 
-          <h1 className="mk-hero-title">
+          <h2 className={`mk-hero-title ${s.pkg ? "mk-hero-title--pkg" : ""}`}>
             <span className="mk-line">
               <span className="mk-rise" key={`t-${active}`}>{s.name}</span>
             </span>
-          </h1>
+          </h2>
 
           <p className="mk-hero-desc mk-hero-desc-in" key={`d-${active}`}>
             {s.description}
           </p>
 
+          {meta.length > 0 && (
+            <p className="mk-hero-meta mk-hero-desc-in" key={`m-${active}`}>
+              {meta.map((m) => <span key={m}>{m}</span>)}
+            </p>
+          )}
+
           <div className="mk-hero-link-in" key={`l-${active}`}>
             <a
               className="mk-alink"
-              href="/search"
-              onClick={(e) => { e.preventDefault(); navigate("/search"); }}
+              href={href}
+              onClick={(e) => { e.preventDefault(); navigate(href); }}
             >
-              {t("hero_explore")} — {s.name}
+              {s.pkg ? t("hero_view") : <>{t("hero_explore")} — {s.name}</>}
               <Arrow />
             </a>
           </div>

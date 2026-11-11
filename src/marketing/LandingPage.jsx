@@ -1,41 +1,54 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTravelData } from "../context/TravelDataContext";
-import { heroSlidesFromPackages, fallbackHeroSlides, isHeroSlideDoc } from "../services/heroSlides";
-import { isOmraDoc } from "../services/omra";
-import { isContactDoc } from "../services/siteContact";
+import { heroSlidesFromPackages, fallbackHeroSlides } from "../services/heroSlides";
+import { isSiteDoc } from "../services/siteDocs";
+import { getUpcomingDepartures } from "../services/operations";
+import { useAgency } from "../services/useAgency";
 import { OmraTeaser } from "./OmraPage";
 import Header from "./Header";
 import Hero from "./Hero";
 import HeroSearch from "./HeroSearch";
-import {
-  Destinations,
-  Trips,
-  Values,
-  Stats,
-  Adventures,
-  Testimonials,
-  CtaBand,
-  Footer,
-} from "./Sections";
+import { Values, Testimonials, CtaBand, Footer } from "./Sections";
+import { UpcomingDepartures, TripsShowcase, HowItWorks, AgencyStats, DestinationsBand, CustomTrip } from "./HomeSections";
+import { packageCards, packageHeroSlides } from "./homeData";
+import { useLocale } from "./i18n";
 import { usePageMeta } from "./usePageMeta";
+import { agencyJsonLd, websiteJsonLd } from "./seo";
 import "./marketing.css";
 
+const MAX_SLIDES = 6;
+
 export default function LandingPage() {
-  const { packages, destinations, adventures, testimonials } = useTravelData();
+  const { packages, destinations, testimonials } = useTravelData();
+  const { locale } = useLocale();
+  const agency = useAgency();
+  const [departures, setDepartures] = useState([]);
 
-  // No args: falls back to the site's default title — resets the tab title
-  // when navigating back home from a package page that set its own.
-  usePageMeta();
+  // Titre et description par défaut du site + l'agence en données structurées.
+  const jsonLd = useMemo(() => [agencyJsonLd(agency), websiteJsonLd()], [agency]);
+  usePageMeta(undefined, undefined, { path: "/", jsonLd });
 
+  // Dates réelles (places restantes) — sans elles, la home reste complète
+  // avec les dates calculées depuis les packages.
+  useEffect(() => {
+    let alive = true;
+    getUpcomingDepartures(365, 50)
+      .then((d) => alive && setDepartures(Array.isArray(d) ? d : []))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const realPackages = useMemo(() => (packages || []).filter((p) => !isSiteDoc(p)), [packages]);
+  const cards = useMemo(() => packageCards(realPackages, departures, locale), [realPackages, departures, locale]);
+
+  // Hero : packages « À la une » d'abord, puis les diapositives du CMS.
+  const cmsSlides = useMemo(() => heroSlidesFromPackages(packages), [packages]);
   const heroSlides = useMemo(() => {
-    const fromDb = heroSlidesFromPackages(packages);
-    return fromDb.length ? fromDb : fallbackHeroSlides();
-  }, [packages]);
-
-  const realPackages = useMemo(
-    () => (packages || []).filter((p) => !isHeroSlideDoc(p) && !isOmraDoc(p) && !isContactDoc(p)),
-    [packages]
-  );
+    const slides = [...packageHeroSlides(cards), ...cmsSlides].slice(0, MAX_SLIDES);
+    return slides.length ? slides : fallbackHeroSlides();
+  }, [cards, cmsSlides]);
 
   // `?at=<section-id|y>` — deterministic landing position (deep links, headless shots)
   useEffect(() => {
@@ -58,15 +71,17 @@ export default function LandingPage() {
       <main>
         <div className="mk-hero-zone">
           <Hero slides={heroSlides} />
-          <HeroSearch destinations={destinations} heroSlides={heroSlides} />
+          <HeroSearch destinations={destinations} heroSlides={cmsSlides.length ? cmsSlides : fallbackHeroSlides()} />
         </div>
-        <Destinations destinations={destinations} heroSlides={heroSlides} />
-        <Trips packages={realPackages} />
-        <Values />
-        <Stats />
-        <Adventures adventures={adventures} heroSlides={heroSlides} />
+        <UpcomingDepartures departures={departures} />
+        <TripsShowcase cards={cards} />
         <OmraTeaser packages={packages} />
-        <Testimonials testimonials={testimonials} />
+        <HowItWorks agency={agency} />
+        <Values />
+        <AgencyStats agency={agency} />
+        <Testimonials testimonials={testimonials} agency={agency} />
+        <DestinationsBand destinations={destinations} cards={cards} />
+        <CustomTrip agency={agency} />
         <CtaBand />
       </main>
       <Footer />

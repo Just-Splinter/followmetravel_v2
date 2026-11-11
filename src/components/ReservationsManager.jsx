@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { downloadCsv, paymentsRows, reservationsRows } from "../services/exports";
+import {
+  AssigneeSelect, CostsTab, DocumentsTab, HistoryTab, ScheduleTab, TravelersTab,
+} from "./reservation/ReservationTabs";
 import { useReservation } from "../context/ReservationContext";
 import { useHotels, wouldExceedCapacity } from "../context/HotelsContext";
 import HotelPicker from "./HotelPicker";
 import NewReservationModal from "./NewReservationModal";
 import db, { Collections } from "../services/database";
 import { roomTypesFor } from "../services/roomTypes";
-import { sendTriggerEmail, buildReservationParams } from "../services/emailSender";
+import { sendTriggerEmail } from "../services/emailSender";
 import { useInjectStyles, STATUS_TRIGGER } from "../services/reservationShared";
 import {
   Search, X, Eye, Edit3, Trash2,
@@ -15,7 +21,8 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, AlertCircle,
   TrendingUp, Package, Hotel, Plane,
   Gift, Save, Plus,
-  Wallet, Banknote, ArrowRightLeft, Pencil, History
+  Wallet, Banknote, ArrowRightLeft, Pencil, History,
+  CalendarClock, FileDown
 } from "lucide-react";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -126,8 +133,10 @@ function ConfirmModal({ open, title, message, onConfirm, onCancel, variant = "da
   );
 }
 
-// ─── Drawer ──────────────────────────────────────────────────────────────────
-function Drawer({ open, onClose, title, icon: Icon, width = 780, children }) {
+// ─── Fenêtre de détail (modale centrée) ─────────────────────────────────────
+// Même fenêtre partout : page Réservations et modale de détail commune
+// (components/detail/DetailModalProvider), ouverte depuis n'importe quel tableau.
+function Drawer({ open, onClose, title, icon: Icon, width = 900, children }) {
   useEffect(() => {
     const h = (e) => e.key === "Escape" && onClose();
     if (open) window.addEventListener("keydown", h);
@@ -136,10 +145,16 @@ function Drawer({ open, onClose, title, icon: Icon, width = 780, children }) {
   return (
     <>
       <div className="res-drawer-backdrop" onClick={onClose} style={{ opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none" }} />
-      <div className="res-drawer" style={{ width, transform: open ? "translateX(0)" : "translateX(100%)", pointerEvents: open ? "auto" : "none" }}>
+      <div
+        className="res-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : undefined}
+        style={{ "--sheet-w": `${width}px`, opacity: open ? 1 : 0, transform: open ? "translate(-50%, -50%) scale(1)" : "translate(-50%, -48%) scale(.98)", pointerEvents: open ? "auto" : "none" }}
+      >
         <div className="res-drawer-header">
           <span className="res-drawer-title">{Icon && <Icon size={20} />}{title}</span>
-          <button className="res-modal-close" onClick={onClose}><X size={18} /></button>
+          <button className="res-modal-close" onClick={onClose} aria-label="Fermer"><X size={18} /></button>
         </div>
         <div className="res-drawer-body">{children}</div>
       </div>
@@ -200,34 +215,6 @@ function HotelsBlock({ hotels }) {
 }
 
 // ─── Participants Block (view) ───────────────────────────────────────────────
-function ParticipantsBlock({ participants }) {
-  const list = parseJSON(participants);
-  if (!list.length) return <div style={{ color: "#94a3b8", fontSize: 13 }}>Aucun participant</div>;
-  return (
-    <div>
-      {list.map((p, i) => (
-        <div key={i} className="res-participant-card" style={{ animationDelay: `${i * 0.04}s` }}>
-          <div className="res-participant-num">{i + 1}</div>
-          <div className="res-participant-info">
-            {p?.fullName ? (
-              <>
-                <div className="res-participant-name">{p.fullName}</div>
-                <div className="res-participant-meta">
-                  {p.phone && <span><Phone size={10} /> {p.phone}</span>}
-                  {p.email && <span><Mail size={10} /> {p.email}</span>}
-                </div>
-              </>
-            ) : (
-              <div className="res-participant-empty">Informations non renseignées</div>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Supplements Block (view) ────────────────────────────────────────────────
 function SupplementsBlock({ supplements }) {
   const list = parseJSON(supplements);
   if (!list.length) return <div style={{ color: "#94a3b8", fontSize: 13, fontStyle: "italic" }}>Aucun supplément</div>;
@@ -237,8 +224,16 @@ function SupplementsBlock({ supplements }) {
         <div key={i} className="res-supplement-item" style={{ animationDelay: `${i * 0.05}s` }}>
           <div className="res-supplement-icon"><Gift size={15} /></div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 12 }}>{s.label || s.name || JSON.stringify(s)}</div>
-            {s.price && <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>{fmt(s.price)}</div>}
+            {/* Ancien format : clé seule (tous les voyageurs) ; nouveau : { label, qty, pricePerPax, price }. */}
+            <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 12 }}>
+              {typeof s === "string" ? s : s.label || s.name || s.key}
+              {s.qty ? <span style={{ fontWeight: 500, color: "#64748b" }}> — {s.qty} voyageur{s.qty > 1 ? "s" : ""}</span> : null}
+            </div>
+            {(s.price || s.pricePerPax) ? (
+              <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>
+                {s.pricePerPax && s.qty ? `${fmt(s.pricePerPax)} × ${s.qty} = ` : ""}{fmt(s.price ?? s.pricePerPax * (s.qty || 1))}
+              </div>
+            ) : null}
           </div>
         </div>
       ))}
@@ -493,7 +488,7 @@ function PaymentsTab({ res, onSave, notify }) {
 }
 
 // ─── Detail Drawer (with inline edit per tab) ───────────────────────────────
-export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notify }) {
+export function DetailDrawer({ onLocalUpdate, open, res, onClose, onSave, onStatusChange, notify }) {
   const { getBooked, refreshAvailability } = useHotels();
   useEffect(() => { refreshAvailability(); }, [refreshAvailability]);
 
@@ -548,13 +543,11 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
   // Per-tab editing states
   const [editDetails, setEditDetails] = useState(false);
   const [editHotels, setEditHotels] = useState(false);
-  const [editParticipants, setEditParticipants] = useState(false);
   const [editSupplements, setEditSupplements] = useState(false);
 
   // Drafts
   const [draftDetails, setDraftDetails] = useState({});
   const [draftHotels, setDraftHotels] = useState([]);
-  const [draftParticipants, setDraftParticipants] = useState([]);
   const [draftSupplements, setDraftSupplements] = useState([]);
 
   const [savingTab, setSavingTab] = useState(null);
@@ -566,7 +559,6 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
       setPS(null);
       setEditDetails(false);
       setEditHotels(false);
-      setEditParticipants(false);
       setEditSupplements(false);
     }
   }, [open]);
@@ -585,9 +577,8 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
       ref:           res.ref || "",
     });
     setDraftHotels(parseJSON(res.hotels));
-    setDraftParticipants(parseJSON(res.participants));
-    setDraftSupplements(parseJSON(res.supplements));
-  }, [res?.$id, editDetails, editHotels, editParticipants, editSupplements]);
+    setDraftSupplements(parseJSON(res.supplements).map((s) => (typeof s === "string" ? { key: s, label: s } : s)));
+  }, [res?.$id, editDetails, editHotels, editSupplements]);
 
   if (!res) return null;
 
@@ -600,9 +591,13 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
   const TABS = [
     { id: "details",      label: "Réservation",                       icon: FileText },
     { id: "hotels",       label: `Hôtels (${hotels.length})`,         icon: Hotel },
-    { id: "participants", label: `Participants (${participants.length})`, icon: Users },
+    { id: "participants", label: `Voyageurs (${participants.filter(p => p?.fullName).length}/${res.totalPax || participants.length})`, icon: Users },
     { id: "supplements",  label: `Suppléments (${supplements.length})`, icon: Gift },
     { id: "payments",     label: `Paiements (${payments.length})`,    icon: Receipt },
+    { id: "schedule",     label: "Échéancier",                         icon: CalendarClock },
+    { id: "documents",    label: "Documents",                          icon: FileText },
+    { id: "costs",        label: "Coûts & marge",                      icon: TrendingUp },
+    { id: "history",      label: "Historique",                         icon: History },
   ];
 
   const handleStatusConfirm = async () => {
@@ -637,10 +632,6 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
     const ok = await saveTab("hotels", { hotels: JSON.stringify(draftHotels) });
     if (ok) setEditHotels(false);
   };
-  const saveParticipants = async () => {
-    const ok = await saveTab("participants", { participants: JSON.stringify(draftParticipants) });
-    if (ok) setEditParticipants(false);
-  };
   const saveSupplements = async () => {
     const ok = await saveTab("supplements", { supplements: JSON.stringify(draftSupplements) });
     if (ok) setEditSupplements(false);
@@ -662,11 +653,6 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
   const addHotel = () => setDraftHotels(hs => [...hs, { name: "", hotelId: null, rooms: [{ type: "Double", qty: 1 }], subtotal: 0, pax: 0 }]);
   const removeHotel = (i) => setDraftHotels(hs => hs.filter((_, idx) => idx !== i));
 
-  // Participants edit helpers
-  const updateParticipant = (i, field, val) => setDraftParticipants(ps => ps.map((p, idx) => idx === i ? { ...p, [field]: val } : p));
-  const addParticipant = () => setDraftParticipants(ps => [...ps, { fullName: "", phone: "", email: "" }]);
-  const removeParticipant = (i) => setDraftParticipants(ps => ps.filter((_, idx) => idx !== i));
-
   // Supplements edit helpers
   const updateSupplement = (i, field, val) => setDraftSupplements(ss => ss.map((s, idx) => idx === i ? { ...s, [field]: field === "price" ? Number(val) : val } : s));
   const addSupplement = () => setDraftSupplements(ss => [...ss, { label: "", price: 0 }]);
@@ -684,13 +670,14 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title={res.packageTitle || "Réservation"} icon={Eye} width={780}>
+    <Drawer open={open} onClose={onClose} title={res.packageTitle || "Réservation"} icon={Eye} width={900}>
       <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <User size={14} /> {res.userName}
         {lead?.phone && <><span style={{ color: "#cbd5e1" }}>·</span><Phone size={12} /> {lead.phone}</>}
         {(res.userEmail || lead?.email) && <><span style={{ color: "#cbd5e1" }}>·</span><Mail size={12} /> {res.userEmail || lead.email}</>}
         <span style={{ color: "#cbd5e1" }}>·</span>
         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#94a3b8" }}>{res.ref}</span>
+        <span style={{ marginLeft: "auto" }}><AssigneeSelect res={res} onSave={onSave} notify={notify} /></span>
       </div>
 
       <ConfirmModal
@@ -862,7 +849,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
           {editHotels ? (
             <div style={{ animation: "resSlideDown .3s ease" }}>
               {draftHotels.map((h, hi) => (
-                <div key={hi} style={{ border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "16px 18px", marginBottom: 12, background: "#fafafa", position: "relative" }}>
+                <div key={hi} style={{ border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "16px 18px", marginBottom: 12, background: "#f8fafc", position: "relative" }}>
                   <div style={{ position: "absolute", top: 10, left: 14, fontSize: 10, color: "#94a3b8", fontWeight: 700 }}>HÔTEL {hi + 1}</div>
                   <button
                     onClick={() => removeHotel(hi)}
@@ -876,6 +863,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
                         <label className="res-label">Nom de l'hôtel</label>
                         <HotelPicker
                           value={h.name || ""}
+                          linked={!!h.hotelId}
                           onSelect={({ id, name }) => updateHotelFields(hi, { hotelId: id, name })}
                           inputClassName="res-input"
                         />
@@ -951,57 +939,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
 
       {/* ── TAB: Participants ── */}
       {tab === "participants" && (
-        <div style={{ animation: "resFadeIn .3s ease" }}>
-          <TabHeader
-            icon={Users}
-            title={`Participants (${(editParticipants ? draftParticipants : participants).length})`}
-            editing={editParticipants}
-            onEdit={() => setEditParticipants(true)}
-            onSave={saveParticipants}
-            onCancel={() => setEditParticipants(false)}
-            saving={savingTab === "participants"}
-          />
-
-          {editParticipants ? (
-            <div style={{ animation: "resSlideDown .3s ease" }}>
-              {draftParticipants.map((p, i) => (
-                <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 9, padding: "12px 14px", marginBottom: 8, background: "#fafafa", position: "relative" }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: 5, background: "rgba(255,117,14,.1)", color: "#ff750e", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800 }}>{i + 1}</div>
-                    PARTICIPANT {i + 1}
-                    <button onClick={() => removeParticipant(i)} style={{ marginLeft: "auto", background: "#fef2f2", border: "1px solid rgba(220,38,38,.2)", borderRadius: 5, color: "#dc2626", cursor: "pointer", padding: "2px 7px", fontSize: 10, fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                      <X size={10} /> Retirer
-                    </button>
-                  </div>
-                  <div className="res-field-row">
-                    <div className="res-field" style={{ margin: 0 }}>
-                      <label className="res-label">Nom complet</label>
-                      <input className="res-input" value={p?.fullName || ""} onChange={e => updateParticipant(i, "fullName", e.target.value)} />
-                    </div>
-                    <div className="res-field" style={{ margin: 0 }}>
-                      <label className="res-label">Téléphone</label>
-                      <input className="res-input" value={p?.phone || ""} onChange={e => updateParticipant(i, "phone", e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="res-field" style={{ marginTop: 8, marginBottom: 0 }}>
-                    <label className="res-label">Email</label>
-                    <input className="res-input" type="email" value={p?.email || ""} onChange={e => updateParticipant(i, "email", e.target.value)} />
-                  </div>
-                </div>
-              ))}
-              <Button variant="ghost" onClick={addParticipant}>
-                <Plus size={14} /> Ajouter un participant
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: 14, color: "#64748b", fontSize: 13 }}>
-                {participants.filter(p => p?.fullName).length} / {participants.length} renseignés
-              </div>
-              <ParticipantsBlock participants={res.participants} />
-            </>
-          )}
-        </div>
+        <TravelersTab res={res} onSave={onSave} notify={notify} />
       )}
 
       {/* ── TAB: Suppléments ── */}
@@ -1020,7 +958,7 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
           {editSupplements ? (
             <div style={{ animation: "resSlideDown .3s ease" }}>
               {draftSupplements.map((s, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 14px", background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 9, marginBottom: 6 }}>
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 9, marginBottom: 6 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,117,14,.08)", color: "#ff750e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Gift size={15} />
                   </div>
@@ -1045,6 +983,22 @@ export function DetailDrawer({ open, res, onClose, onSave, onStatusChange, notif
       {tab === "payments" && (
         <PaymentsTab res={res} onSave={onSave} notify={notify} />
       )}
+
+      {tab === "schedule" && <ScheduleTab res={res} onSave={onSave} notify={notify} />}
+      {tab === "documents" && <DocumentsTab res={res} onUpdated={onLocalUpdate} notify={notify} />}
+      {tab === "costs" && <CostsTab res={res} onSave={onSave} notify={notify} />}
+      {tab === "history" && <HistoryTab res={res} />}
+
+      {/* Pied fixe : repères du dossier toujours visibles + fermeture */}
+      <div className="adm-modal-footer" style={{ justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--adm-muted)", flexWrap: "wrap" }}>
+          <StatusBadge status={res.status} />
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>{res.ref}</span>
+          <span>· {res.totalPax} voyageur{Number(res.totalPax) > 1 ? "s" : ""}</span>
+          <strong style={{ color: "var(--adm-text)" }}>{fmt(res.totalEstimate)}</strong>
+        </div>
+        <Button variant="ghost" onClick={onClose}>Fermer</Button>
+      </div>
     </Drawer>
   );
 }
@@ -1110,6 +1064,9 @@ export default function ReservationsManager() {
   const [loading, setLoading]       = useState(true);
 
   const [viewTarget, setViewTarget] = useState(null);
+  const [mineOnly, setMineOnly]     = useState(false);
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [delTarget, setDelTarget]   = useState(null);
   const [delLoading, setDelLoading] = useState(false);
   const [toast, setToast]           = useState(null);
@@ -1123,6 +1080,20 @@ export default function ReservationsManager() {
     setLoading(true);
     findAllReservations().finally(() => setLoading(false));
   }, [findAllReservations]);
+
+  // Lien direct vers un dossier (planning, échéancier, pipeline) : ?open=<id>.
+  // Dérivé de l'URL tant qu'aucune ligne n'a été ouverte à la main.
+  const openId = searchParams.get("open");
+  const shownTarget = viewTarget ?? (openId ? reservations.find((r) => r.$id === openId) ?? null : null);
+  const closeDrawer = () => {
+    setViewTarget(null);
+    if (openId) setSearchParams((p) => { p.delete("open"); return p; }, { replace: true });
+  };
+
+  const localUpdate = (doc) => {
+    setReservations(rs => rs.map(r => r.$id === doc.$id ? { ...r, ...doc } : r));
+    setViewTarget(v => v?.$id === doc.$id ? { ...v, ...doc } : v);
+  };
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -1139,6 +1110,7 @@ export default function ReservationsManager() {
         (r.ref || "").toLowerCase().includes(q) ||
         (r.userEmail || "").toLowerCase().includes(q))
       && (filterStatus === "all" || r.status === filterStatus)
+      && (!mineOnly || r.assignedTo === user?.$id)
     );
   });
 
@@ -1180,11 +1152,7 @@ export default function ReservationsManager() {
 
       const triggerKey = STATUS_TRIGGER[newStatus];
       if (triggerKey) {
-        const updated = { ...res, status: newStatus, ...result };
-        sendTriggerEmail(triggerKey, {
-          params: buildReservationParams(updated),
-          targetEmails: [updated.userEmail].filter(Boolean),
-        });
+        sendTriggerEmail(triggerKey, { reservationId: id });
       }
     } catch {
       notify("Erreur lors du changement de statut", "error");
@@ -1280,9 +1248,20 @@ export default function ReservationsManager() {
               </Pill>
             ))}
           </div>
-          <button className="res-btn primary" style={{ marginLeft: "auto" }} onClick={() => setNewOpen(true)}>
-            <Plus size={15} /> Nouvelle réservation
-          </button>
+          <Pill active={mineOnly} onClick={() => { setMineOnly(v => !v); setPage(1); }} count={reservations.filter(r => r.assignedTo === user?.$id).length}>
+            Mes dossiers
+          </Pill>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button className="res-btn ghost" title="Export Excel (CSV) des réservations filtrées" onClick={() => { const { headers, rows } = reservationsRows(sorted); downloadCsv(`reservations-${new Date().toISOString().slice(0, 10)}`, headers, rows); }}>
+              <FileDown size={15} /> Réservations
+            </button>
+            <button className="res-btn ghost" title="Export Excel (CSV) des paiements, pour le rapprochement bancaire" onClick={() => { const { headers, rows } = paymentsRows(sorted); downloadCsv(`paiements-${new Date().toISOString().slice(0, 10)}`, headers, rows); }}>
+              <FileDown size={15} /> Paiements
+            </button>
+            <button className="res-btn primary" onClick={() => setNewOpen(true)}>
+              <Plus size={15} /> Nouvelle réservation
+            </button>
+          </div>
         </div>
 
         {/* ── Table ── */}
@@ -1345,7 +1324,7 @@ export default function ReservationsManager() {
                   const hotels = parseJSON(res.hotels);
                   const lead   = getLeadParticipant(res.participants);
                   return (
-                    <tr key={res.$id} className="res-row" style={{ animationDelay: `${idx * 0.03}s` }}>
+                    <tr key={res.$id} className="res-row is-clickable" style={{ animationDelay: `${idx * 0.03}s` }} onClick={() => setViewTarget(res)}>
 
                       <td>
                         <div className="res-pkg-title">
@@ -1399,7 +1378,7 @@ export default function ReservationsManager() {
                         {fmtDate(res.$createdAt)}
                       </td>
 
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <div className="res-actions">
                           <button className="res-icon-btn primary" title="Voir / Modifier" onClick={() => setViewTarget(res)}><Eye size={15} /></button>
                           <button className="res-icon-btn danger" title="Supprimer" onClick={() => setDelTarget(res)}><Trash2 size={15} /></button>
@@ -1426,9 +1405,10 @@ export default function ReservationsManager() {
 
       {/* ── Detail Drawer (with inline edit per tab) ── */}
       <DetailDrawer
-        open={!!viewTarget}
-        res={viewTarget}
-        onClose={() => setViewTarget(null)}
+        onLocalUpdate={localUpdate}
+        open={!!shownTarget}
+        res={shownTarget}
+        onClose={closeDrawer}
         onSave={handleSave}
         onStatusChange={handleStatusChange}
         notify={notify}

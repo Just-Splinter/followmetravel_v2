@@ -6,7 +6,8 @@ import {
   useEffect,
 } from "react";
 
-import db, { Collections, ID, Query, PUBLIC_CATALOG_PERMISSIONS, PUBLIC_PACKAGE_STATUSES } from "../services/database";
+import db, { Collections, ID, Query } from "../services/database";
+import { isPubliclyVisible, isSiteDoc } from "../services/siteDocs";
 
 const TravelDataContext = createContext(null);
 
@@ -50,7 +51,7 @@ export function TravelDataProvider({ children }) {
 
     create: (data) =>
       execute(async () => {
-        const doc = await db.create(collection, data, ID.unique(), PUBLIC_CATALOG_PERMISSIONS);
+        const doc = await db.create(collection, data, ID.unique());
         setter((prev) => [...prev, doc]);
         return doc;
       }),
@@ -90,7 +91,10 @@ export function TravelDataProvider({ children }) {
     fetch: (queries = []) =>
       execute(async () => {
         const res = await db.listAll(Collections.PRODUCTS, queries);
-        const docs = (res.documents ?? res).filter((p) => PUBLIC_PACKAGE_STATUSES.includes(p.status));
+        // Packages visibles + documents de réglages du site (hero, contact,
+        // notifications, agence…) : ces derniers sont en "draft" pour ne jamais
+        // apparaître comme un package, mais le site et le CMS doivent les lire.
+        const docs = (res.documents ?? res).filter((p) => isSiteDoc(p) || isPubliclyVisible(p));
         setPackages(docs);
         return { ...res, documents: docs };
       }, true),
@@ -135,6 +139,12 @@ export function TravelDataProvider({ children }) {
       {children}
     </TravelDataContext.Provider>
   );
+}
+
+/** Même contexte, mais `null` hors du fournisseur (composants partagés : footer…). */
+// eslint-disable-next-line react-refresh/only-export-components -- hook du contexte, comme useTravelData
+export function useTravelDataOptional() {
+  return useContext(TravelDataContext);
 }
 
 export function useTravelData() {

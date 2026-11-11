@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: followmetravel
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: followmetravel
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - minio.yaml
+  - api.yaml
+  - cronjobs.yaml
+images:
+  - name: followmetravel/api
+    newName: hamzashoul/followmetravel-api
+    newTag: "0.7.1"

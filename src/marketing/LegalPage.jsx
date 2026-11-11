@@ -1,8 +1,11 @@
 import { useMemo } from "react";
-import { useParams, Navigate } from "react-router-dom";
+import { useParams, Navigate, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import { Footer } from "./Sections";
 import { usePageMeta } from "./usePageMeta";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { useAgency } from "../services/useAgency";
 import "./marketing.css";
 
 // Starting-point legal text for a Moroccan travel agency taking online
@@ -122,7 +125,11 @@ const LEGAL_CONTENT = {
 
 export default function LegalPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const content = LEGAL_CONTENT[slug];
+  const agency = useAgency();
+  // CGV saisies dans Paramètres → Agence : elles remplacent le texte par défaut.
+  const customCgv = slug === "cgv" && agency.cgvText?.trim();
 
   const updatedLabel = useMemo(
     () => new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
@@ -135,25 +142,58 @@ export default function LegalPage() {
 
   return (
     <div className="mk">
-      <Header light />
+      <Header />
       <main style={{ minHeight: "60vh" }}>
         <div className="mk-wrap mk-page-head" style={{ paddingBottom: 28 }}>
           <span className="mk-eyebrow">Follow Me Travel</span>
           <h1 className="mk-h2" style={{ marginTop: 16 }}>{content.title}</h1>
         </div>
 
-        <div className="mk-wrap mk-legal">
-          <p className="mk-legal-notice">
-            Dernière mise à jour : {updatedLabel}. Ce document est fourni à titre indicatif — pour toute question,
-            contactez-nous à <a href="mailto:contact@followmetravel.ma">contact@followmetravel.ma</a>.
-          </p>
+        {/* Documents + sommaire à gauche, texte à droite */}
+        <div className="mk-wrap mk-legal-wrap">
+          <aside className="mk-legal-side">
+            <nav className="mk-legal-docs" aria-label="Documents">
+              {Object.entries(LEGAL_CONTENT).map(([key, doc]) => (
+                <a
+                  key={key}
+                  href={`/legal/${key}`}
+                  className={key === slug ? "is-active" : ""}
+                  aria-current={key === slug ? "page" : undefined}
+                  onClick={(e) => { e.preventDefault(); navigate(`/legal/${key}`); }}
+                >
+                  {doc.title}
+                </a>
+              ))}
+            </nav>
+            {!customCgv && content.sections.length > 1 && (
+              <nav className="mk-legal-toc" aria-label="Sommaire">
+                <em>Sommaire</em>
+                {content.sections.map((s, i) => (
+                  <a key={s.heading} href={`#legal-${i}`}>{s.heading}</a>
+                ))}
+              </nav>
+            )}
+          </aside>
 
-          {content.sections.map((s) => (
-            <section key={s.heading} className="mk-legal-section">
-              <h2>{s.heading}</h2>
-              {s.body.map((p, i) => <p key={i}>{p}</p>)}
-            </section>
-          ))}
+          <div className="mk-legal">
+            <p className="mk-legal-notice">
+              Dernière mise à jour : {updatedLabel}. Ce document est fourni à titre indicatif — pour toute question,
+              contactez-nous à <a href={`mailto:${agency.email}`}>{agency.email}</a>.
+            </p>
+
+            {customCgv ? (
+              <section className="mk-legal-section">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{customCgv}</ReactMarkdown>
+              </section>
+            ) : (
+              content.sections.map((s, i) => (
+                <section key={s.heading} id={`legal-${i}`} className="mk-legal-section">
+                  <h2>{s.heading}</h2>
+                  {s.body.map((p, j) => <p key={j}>{p}</p>)}
+                </section>
+              ))
+            )}
+          </div>
         </div>
       </main>
       <Footer />

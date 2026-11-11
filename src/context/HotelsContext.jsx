@@ -5,23 +5,13 @@ import {
   useCallback,
   useEffect,
 } from "react";
-import { Permission, Role } from "appwrite";
 
 import db, { Collections, ID, Query } from "../services/database";
 
-// Set explicitly at creation time rather than relying on the "hotels"
-// collection's console-configured defaults: readable by anyone (it's just
-// a public catalog), updatable by any logged-in customer (BookingFlow needs
-// this to bump bookedSnapshot right after a booking — see submit() there),
-// deletable only by admins. Appwrite has no field-level permissions, so a
-// customer *can* technically overwrite name/city/etc via a raw API call,
-// not just bookedSnapshot — known trade-off, the real fix is a server
-// Function scoped to just that field.
-const HOTEL_PERMISSIONS = [
-  Permission.read(Role.any()),
-  Permission.update(Role.users()),
-  Permission.delete(Role.label("admin")),
-];
+// Access rules live in the API (api/src/collections/policies.ts): readable
+// by anyone (public catalog), created/deleted by admins, and a logged-in
+// customer may update `bookedSnapshot` only (BookingFlow bumps it right
+// after a booking — see submit() there).
 
 const HotelsContext = createContext(null);
 
@@ -152,7 +142,7 @@ export function HotelsProvider({ children }) {
   const createHotel = useCallback(
     (hotel) =>
       execute(async () => {
-        const doc = await db.create(Collections.HOTELS, { ...hotel }, ID.unique(), HOTEL_PERMISSIONS);
+        const doc = await db.create(Collections.HOTELS, { ...hotel }, ID.unique());
         setHotels((prev) => [...prev, doc]);
         return doc;
       }),

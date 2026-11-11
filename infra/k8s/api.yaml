@@ -1,0 +1,117 @@
+# API NestJS (api/). Configuration non secrète ici ; secrets dans le Secret
+# `api-env` (DATABASE_URL, SESSION_SECRET, S3_*, SMTP_URL, GOOGLE_*, RECAPTCHA_SECRET),
+# créé hors git — voir README.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+data:
+  PORT: "3000"
+  FRONT_ORIGINS: "https://followmetravel.ma,https://www.followmetravel.ma,http://localhost:5173"
+  API_PUBLIC_URL: "https://api-followmetravel.oneiro-lego.com"
+  COOKIE_SECURE: "true"
+  # "none" tant que le front (followmetravel.ma) et l'API (oneiro-lego.com) sont sur
+  # deux sites différents. Passer à "lax" (et API_PUBLIC_URL) une fois
+  # api.followmetravel.ma pointé sur le cluster.
+  COOKIE_SAMESITE: "none"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_BUCKET: "followmetravel"
+  MEDIA_PUBLIC_URL: "https://s3-followmetravel.oneiro-lego.com/followmetravel"
+  # Adresse de la boîte SMTP authentifiée (sinon refus / spam).
+  MAIL_FROM: "Follow Me Travel <admin@followmetravel.ma>"
+  # PHASE DE TEST : tous les emails partent vers cette adresse (sujet préfixé
+  # des vrais destinataires). À supprimer au lancement.
+  MAIL_REDIRECT_TO: "admin@followmetravel.ma"
+  RECAPTCHA_MIN_SCORE: "0.5"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Utilisateur `node` de l'image officielle (UID numérique exigé par runAsNonRoot).
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: api
+          image: followmetravel/api # remplacé par kustomization.yaml (images)
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: api-config
+            - secretRef:
+                name: api-env
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  selector:
+    app: api
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Uploads d'images (20 Mo max côté API) + JSON des packages.
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [api-followmetravel.oneiro-lego.com]
+      secretName: api-tls
+  rules:
+    - host: api-followmetravel.oneiro-lego.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port: { name: http }

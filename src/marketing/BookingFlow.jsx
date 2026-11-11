@@ -8,23 +8,26 @@ import { upcomingDepartures } from "./dates";
 import { roomTypesFor } from "../services/roomTypes";
 import db, { Collections } from "../services/database";
 import { parseBookedSnapshot } from "../context/HotelsContext";
+import { getAvailability } from "../services/operations";
+import { CIVILITIES, passportExpiryIssue } from "../services/travelers";
+import { formuleMode } from "../services/formules";
+import { useAgency } from "../services/useAgency";
+import { useNavigate } from "react-router-dom";
+import Header from "./Header";
+import { Footer } from "./Sections";
+import { Arrow } from "./ui";
 
-/* ─── Business contract (identical to the legacy modal / admin manager) ───── */
-const DEFAULT_SUPPLEMENTS = [
-  { key: "excursions", label: "Pack Excursions", pricePerPax: 800 },
-  { key: "princes", label: "Îles des Princes + déjeuner", pricePerPax: 350 },
-  { key: "bursa", label: "Excursion Bursa", pricePerPax: 250 },
-  { key: "shopping", label: "City Tour & Shopping Day", pricePerPax: 200 },
-  { key: "bosphore", label: "Croisière Bosphore by Night", pricePerPax: 300 },
-];
 const parsePrice = (str) => parseFloat(String(str ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
 
 /* ─── Wizard ─────────────────────────────────────────────────────────────── */
+/* Page de réservation (route /reserver/:id ; sur place dans l'aperçu de l'éditeur).
+   onClose : retour à la fiche du voyage. */
 export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = null, preview = false }) {
   const { t, locale } = useLocale();
+  const navigate = useNavigate();
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const { createReservation } = useReservation();
-  const { trackPayment, trackAbandon } = useEvents();
+  const { trackPayment, trackAbandon, trackBookingStep } = useEvents();
   const { executeRecaptcha } = useGoogleReCaptcha();
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
   const fmt = (n) => `${nf.format(n)} DH`;
@@ -84,11 +87,18 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
   const roomBlocked = (hotel, rt, nextQty) =>
     !!hotel.blockWhenFull && nextQty > roomRemaining(hotel, rt);
 
-  const [catIdx, setCatIdx] = useState(0);
+  // Formule choisie sur la fiche (?formule=n), sinon la première.
+  const [catIdx, setCatIdx] = useState(() => {
+    const n = Number(prefill?.formule);
+    return Number.isInteger(n) && n >= 0 && n < categories.length ? n : 0;
+  });
   const [dateIdx, setDateIdx] = useState(initialDateIdx);
-  const [rooms, setRooms] = useState({}); // {hotelIdx: {roomKey: qty}}
+  // Une seule configuration de chambres : pour l'hôtel choisi (séjour) ou
+  // pour chaque étape du circuit (le même groupe passe par tous les hôtels).
+  const [rooms, setRooms] = useState({}); // {roomKey: qty}
+  const [hotelIdx, setHotelIdx] = useState(0); // séjour : hôtel choisi parmi les alternatives
   const [pax, setPax] = useState(() => Math.max(1, Number(prefill?.adults) || 2)); // per-person mode
-  const [supp, setSupp] = useState({});
+  const [supp, setSupp] = useState({}); // {key: nombre de voyageurs}
   const [step, setStep] = useState(1);
   const [participants, setParticipants] = useState([{}]);
   const [sending, setSending] = useState(false);
@@ -109,13 +119,28 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
   }, []);
 
   const category = categories[catIdx] || null;
-  const hotels = category?.hotels || [];
+  const hotels = useMemo(() => category?.hotels || [], [category]);
+  const mode = formuleMode(category);
+  const stayHotels = useMemo(
+    () => (mode === "circuit" ? hotels : hotels[hotelIdx] ? [hotels[hotelIdx]] : []),
+    [mode, hotels, hotelIdx]
+  );
   // Price columns of the selected formule, labelled from its own headers.
   const roomTypes = useMemo(() => roomTypesFor(category), [category]);
   const dates = useMemo(() => upcomingDepartures(pkg.departureDates), [pkg.departureDates]);
-  const suppList = pkg.suppliments?.length
-    ? pkg.suppliments.map((s) => ({ key: s.key || s.label, label: s.label, pricePerPax: Number(s.pricePerPax) || 0 }))
-    : DEFAULT_SUPPLEMENTS;
+  const [availability, setAvailability] = useState([]);
+  useEffect(() => {
+    if (preview || !pkg.$id) return;
+    let alive = true;
+    getAvailability(pkg.$id).then((a) => alive && setAvailability(a.departures)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [pkg.$id, preview]);
+  const availOf = (d) => (d ? availability.find((a) => a.from === d.from && (!d.to || a.to === d.to)) || null : null);
+  // Seulement les suppléments du package : plus de liste par défaut (elle
+  // proposait les excursions d'Istanbul sur tous les voyages). Même règle côté API.
+  const suppList = (pkg.suppliments || []).map((s) => ({ key: s.key || s.label, label: s.label, pricePerPax: Number(s.pricePerPax) || 0 }));
 
   /* Preselect the departure nearest to the date requested in the hero form */
   useEffect(() => {
@@ -131,51 +156,44 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { setRooms({}); }, [catIdx]);
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { setRooms({}); setHotelIdx(0); }, [catIdx]);
 
-  /* pricing — same math as the legacy modal (room mode) */
+  /* pricing — prix du type de chambre × voyageurs, sur l'hôtel choisi (séjour)
+     ou sur chaque étape (circuit) ; voyageurs comptés une seule fois */
   const { breakdown, baseTotal, totalPax } = useMemo(() => {
     if (perPerson) {
       return { breakdown: [], baseTotal: ppPrice * pax, totalPax: pax };
     }
-    let baseTotal = 0, totalPax = 0;
-    const breakdown = [];
-    Object.entries(rooms).forEach(([hIdx, r]) => {
-      const hotel = hotels[Number(hIdx)];
-      if (!hotel) return;
+    const roomPax = roomTypes.reduce((a, rt) => a + (rooms[rt.key] || 0) * rt.paxPerRoom, 0);
+    if (!roomPax) return { breakdown: [], baseTotal: 0, totalPax: 0 };
+    let baseTotal = 0;
+    const breakdown = stayHotels.map((hotel) => {
       const lines = [];
-      let hTotal = 0, hPax = 0;
+      let hTotal = 0;
       roomTypes.forEach((rt) => {
-        const qty = r[rt.key] || 0;
+        const qty = rooms[rt.key] || 0;
         if (qty <= 0) return;
-        const price = parsePrice(hotel.cols?.[rt.colIdx]);
-        const pax = qty * rt.paxPerRoom;
-        hTotal += price * pax;
-        hPax += pax;
-        lines.push({ label: rt.label, qty, subtotal: price * pax });
+        const subtotal = parsePrice(hotel.cols?.[rt.colIdx]) * qty * rt.paxPerRoom;
+        hTotal += subtotal;
+        lines.push({ label: rt.label, qty, subtotal });
       });
-      if (hPax > 0) {
-        baseTotal += hTotal; totalPax += hPax;
-        breakdown.push({ name: hotel.name, hotelId: hotel.hotelId || null, lines, total: hTotal, pax: hPax });
-      }
+      baseTotal += hTotal;
+      return { name: hotel.name, hotelId: hotel.hotelId || null, lines, total: hTotal, pax: roomPax };
     });
-    return { breakdown, baseTotal, totalPax };
-  }, [rooms, hotels, roomTypes, perPerson, ppPrice, pax]);
+    return { breakdown, baseTotal, totalPax: roomPax };
+  }, [rooms, stayHotels, roomTypes, perPerson, ppPrice, pax]);
 
-  const suppTotal = suppList.reduce((a, s) => (supp[s.key] ? a + s.pricePerPax * totalPax : a), 0);
-  const grandTotal = baseTotal + suppTotal;
+  // Suppléments : chacun pour le nombre de voyageurs choisi (plafonné au total).
+  const suppQty = (key) => Math.min(supp[key] || 0, totalPax);
+  const suppTotal = suppList.reduce((a, s) => a + s.pricePerPax * suppQty(s.key), 0);
+  const selected = dateIdx !== null ? dates[dateIdx] : null;
+  const departureSupp = Number(selected?.supplement) || 0;
+  const departureSuppTotal = departureSupp * totalPax;
+  const grandTotal = baseTotal + suppTotal + departureSuppTotal;
+  const selectedAvail = availOf(selected);
+  const seatsShort = !!selectedAvail && (selectedAvail.closed || (selectedAvail.remaining !== null && selectedAvail.remaining < totalPax));
   const canContinue =
-    dateIdx !== null && totalPax > 0 && (perPerson ? ppPrice > 0 || true : !!category && breakdown.length > 0);
+    dateIdx !== null && totalPax > 0 && !seatsShort && (perPerson ? ppPrice > 0 || true : !!category && breakdown.length > 0);
 
   useEffect(() => {
     setParticipants((prev) => {
@@ -187,36 +205,48 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
     });
   }, [totalPax]);
 
-  const setQty = (hIdx, key, delta) =>
-    setRooms((prev) => {
-      const h = { ...(prev[hIdx] || {}) };
-      h[key] = Math.max(0, (h[key] || 0) + delta);
-      return { ...prev, [hIdx]: h };
-    });
+  const setQty = (key, delta) => setRooms((prev) => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
 
   const setP = (i, field, value) =>
     setParticipants((prev) => prev.map((p, idx) => (idx === i ? { ...p, [field]: value } : p)));
 
-  const leadValid = !!(participants[0]?.fullName?.trim() && participants[0]?.phone?.trim());
+  // Voyageur 1 (contact principal) : nom et email du compte connecté par défaut,
+  // la saisie du client reste prioritaire.
+  const people = participants.map((p, i) =>
+    i === 0 && user ? { fullName: user.name || "", email: user.email || "", ...p } : p
+  );
+  const leadValid = !!(people[0]?.fullName?.trim() && people[0]?.phone?.trim());
+
+  // Passeports : valables au moins N mois après le retour (Paramètres → Agence).
+  const agency = useAgency();
+  const passportMonths = Number(agency.passportValidityMonths) || 0;
+  const travelEnd = useMemo(() => {
+    const d = dateIdx !== null ? dates[dateIdx] : null;
+    const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(d?.to ?? "").trim());
+    if (!d?.when || !m) return null;
+    let end = new Date(d.when.getFullYear(), Number(m[2]) - 1, Number(m[1]));
+    if (end < d.when) end = new Date(d.when.getFullYear() + 1, Number(m[2]) - 1, Number(m[1]));
+    return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+  }, [dates, dateIdx]);
+  const passportErrors = people.map((p) => passportExpiryIssue(p.passportExpiry, travelEnd, passportMonths));
+  const passportsOk = passportErrors.every((e) => !e);
 
   const submit = async () => {
-    if (!leadValid || sending) return;
+    if (!leadValid || !passportsOk || sending) return;
     if (preview) { setError(t("bk_preview")); return; }
     setSending(true);
     setError(null);
+    trackBookingStep({ targetId: pkg.$id, label: pkg.title || pkg.destination, step: "submit", data: { totalPax } });
     try {
       const selectedDate = dates[dateIdx];
       const packageTitle = `${pkg.destination ?? ""}${pkg.destinationAccent ?? ""}` || pkg.title || "";
       // TRUST BOUNDARY: totalEstimate below (`grandTotal`) is computed
       // entirely client-side from prices already visible in the page's own
       // HTML/JS — nothing stops a visitor from editing it in devtools before
-      // this call fires. createReservation (ReservationContext.jsx) forwards
-      // this payload verbatim to Appwrite Function '6a312ae3000737bbe2ac',
-      // whose source lives outside this repo. That function MUST recompute
-      // the price server-side from packageId/category/hotels/dates and
-      // ignore/validate totalEstimate, or a booking's charged amount can be
-      // manipulated. Not something this repo can verify or fix — check the
-      // function's own source.
+      // this call fires. createReservation (ReservationContext.jsx) posts it
+      // to POST /v1/reservations, which recomputes the price from the
+      // package's catalog data (api/src/reservations/pricing.ts) and only
+      // keeps totalEstimate as `clientEstimate` for comparison.
       const result = await createReservation({
         packageId: pkg.$id ?? pkg.id,
         packageTitle,
@@ -235,16 +265,18 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
         dateFrom: selectedDate.from,
         dateTo: selectedDate.to,
         totalPax,
-        participants: JSON.stringify(participants),
-        supplements: suppList.filter((s) => supp[s.key]).map((s) => s.key),
+        participants: JSON.stringify(people),
+        supplements: suppList.filter((s) => suppQty(s.key) > 0).map((s) => ({ key: s.key, qty: suppQty(s.key) })),
         totalEstimate: grandTotal,
         recaptchaToken: executeRecaptcha ? await executeRecaptcha("reservation") : null,
       });
       if (!result?.success) {
         setError(result?.message || t("bk_err"));
+        trackBookingStep({ targetId: pkg.$id, label: pkg.title || pkg.destination, step: "error", data: { message: result?.message || "" } });
         return;
       }
       setDone(result.reservation || {});
+      trackBookingStep({ targetId: pkg.$id, label: pkg.title || pkg.destination, step: "success", data: { totalEstimate: grandTotal, totalPax } });
       trackPayment({
         targetId: pkg.$id,
         label: packageTitle,
@@ -272,6 +304,8 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
       });
     } catch (err) {
       setError(err?.message === "AUTH_REQUIRED" ? t("bk_auth_t") : err?.message || t("bk_err"));
+      // Erreurs de réservation (complet, captcha, session…) : visibles dans Analytics.
+      trackBookingStep({ targetId: pkg.$id, label: pkg.title || pkg.destination, step: "error", data: { message: err?.message || "" } });
     } finally {
       setSending(false);
     }
@@ -280,6 +314,13 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
   /* ── recap panel ── */
   const recap = (
     <aside className="mk-bk-recap">
+        <div className="mk-bk-trip">
+          {pkg.heroBg ? <img src={pkg.heroBg} alt="" /> : <span aria-hidden="true" />}
+          <div>
+            <b>{pkg.title || `${pkg.destination ?? ""}${pkg.destinationAccent ?? ""}`}</b>
+            <small>{[pkg.country, pkg.durationLabel].filter(Boolean).join(" · ")}</small>
+          </div>
+        </div>
       <h4>{t("bk_recap")}</h4>
       <div className="mk-bk-recap-rows">
         {!perPerson && <div><span>{t("bk_formule")}</span><b>{category?.label ?? "—"}</b></div>}
@@ -287,16 +328,27 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
         {perPerson && (
           <div><span>{t("bk_pp_price")} × {totalPax}</span><b>{fmt(baseTotal)}</b></div>
         )}
-        {breakdown.map((h) => (
-          <div key={h.name} className="mk-bk-recap-hotel">
-            <span>{h.name}</span>
-            <b>{fmt(h.total)}</b>
-            <em>{h.lines.map((l) => `${l.qty}× ${l.label}`).join(" · ")} — {h.pax} {t("bk_travelers")}</em>
+        {mode === "circuit" && breakdown.length > 1 ? (
+          <div className="mk-bk-recap-hotel">
+            <span>{t("bk_circuit_short")}</span>
+            <b>{fmt(baseTotal)}</b>
+            <em>{breakdown.map((h) => h.name).join(" → ")} · {breakdown[0].lines.map((l) => `${l.qty}× ${l.label}`).join(" · ")} — {totalPax} {t("bk_travelers")}</em>
           </div>
+        ) : (
+          breakdown.map((h) => (
+            <div key={h.name} className="mk-bk-recap-hotel">
+              <span>{h.name}</span>
+              <b>{fmt(h.total)}</b>
+              <em>{h.lines.map((l) => `${l.qty}× ${l.label}`).join(" · ")} — {h.pax} {t("bk_travelers")}</em>
+            </div>
+          ))
+        )}
+        {suppList.filter((s) => suppQty(s.key) > 0).map((s) => (
+          <div key={s.key}><span>{s.label} × {suppQty(s.key)}</span><b>{fmt(s.pricePerPax * suppQty(s.key))}</b></div>
         ))}
-        {suppList.filter((s) => supp[s.key]).map((s) => (
-          <div key={s.key}><span>{s.label}</span><b>{fmt(s.pricePerPax * totalPax)}</b></div>
-        ))}
+        {departureSupp !== 0 && (
+          <div><span>{departureSupp > 0 ? "Supplément" : "Réduction"} départ ({fmt(Math.abs(departureSupp))} × {totalPax})</span><b>{departureSupp < 0 ? "−" : ""}{fmt(Math.abs(departureSuppTotal))}</b></div>
+        )}
       </div>
       <div className="mk-bk-total">
         <span>{t("bk_total")}</span>
@@ -320,7 +372,10 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
           </div>
         )}
         <p>{t("bk_ok_d")}</p>
-        <button className="mk-btn" onClick={onClose}>{t("bk_close")}</button>
+        <div className="mk-bk-done-actions">
+          <button className="mk-btn" onClick={() => navigate("/profil#reservations")}>{t("nav_bookings")}</button>
+          <button className="mk-btn mk-btn--ghost" onClick={onClose}>{t("bk_back")}</button>
+        </div>
       </div>
     );
   } else if (!preview && !authLoading && !user) {
@@ -364,12 +419,29 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
               <p className="mk-bk-muted">{t("bk_no_dates")}</p>
             ) : (
               <div className="mk-bk-pills mk-bk-pills--dates">
-                {dates.map((d, i) => (
-                  <button key={d.id ?? i} className={i === dateIdx ? "is-active" : ""} onClick={() => setDateIdx(i)}>
-                    {d.from} → {d.to}
-                  </button>
-                ))}
+                {dates.map((d, i) => {
+                  const a = availOf(d);
+                  const full = !!a?.closed;
+                  const supplement = Number(d.supplement) || 0;
+                  return (
+                    <button key={d.id ?? i} className={i === dateIdx ? "is-active" : ""} disabled={full} onClick={() => setDateIdx(i)} title={full ? "Complet" : undefined}>
+                      {d.from} → {d.to}
+                      {(full || supplement !== 0 || (a && a.remaining !== null && a.remaining <= 6) || a?.guaranteed) && (
+                        <small style={{ display: "block", fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                          {full ? "Complet" : [
+                            supplement ? `${supplement > 0 ? "+" : "−"}${nf.format(Math.abs(supplement))} DH/pers.` : "",
+                            a && a.remaining !== null && a.remaining <= 6 ? `${a.remaining} place${a.remaining > 1 ? "s" : ""}` : "",
+                            a?.guaranteed ? "garanti" : "",
+                          ].filter(Boolean).join(" · ")}
+                        </small>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+            )}
+            {seatsShort && selectedAvail && !selectedAvail.closed && (
+              <p className="mk-bk-error">⚠ Plus que {selectedAvail.remaining} place(s) sur ce départ : réduisez le nombre de voyageurs ou choisissez une autre date.</p>
             )}
           </section>
 
@@ -391,76 +463,108 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
           )}
 
           {!perPerson && (
-          <section>
-            <h4>{t("bk_hotels")}</h4>
-            <div className="mk-bk-hotels">
-              {hotels.map((h, hIdx) => {
-                const sel = rooms[hIdx] || {};
-                const active = Object.values(sel).some((q) => q > 0);
-                return (
-                  <details key={h.id ?? hIdx} className={`mk-bk-hotel ${active ? "is-active" : ""}`} open={active}>
-                    <summary>
-                      <div>
-                        {/* DISPLAY ONLY — the payload still carries the raw h.name */}
-                        <b>{t("bk_hotel_label")} — {h.name}</b>
+            <section>
+              {mode === "circuit" ? (
+                <>
+                  <h4>{t("bk_circuit")}</h4>
+                  <ol className="mk-bk-itinerary">
+                    {hotels.map((h, i) => (
+                      <li key={h.id ?? i}>
+                        <b>{h.city || `${t("bk_step")} ${i + 1}`}</b>
                         <span>
-                          {h.city ? `${h.city} · ` : ""}{h.stars ? `${h.stars}★` : ""}
+                          {/* DISPLAY ONLY — the payload still carries the raw h.name */}
+                          {h.name}{h.stars ? ` · ${h.stars}★` : ""}
                           {h.nights ? ` · ${h.nights} ${Number(h.nights) > 1 ? t("cal_nights") : t("cal_night")}` : ""}
                         </span>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              ) : (
+                <>
+                  <h4>{hotels.length > 1 ? t("bk_choose_hotel") : t("bk_hotels")}</h4>
+                  <div className="mk-bk-hotelpick" role="radiogroup">
+                    {hotels.map((h, i) => {
+                      const prices = roomTypes.map((rt) => parsePrice(h.cols?.[rt.colIdx])).filter((n) => n > 0);
+                      return (
+                        <button
+                          key={h.id ?? i}
+                          role="radio"
+                          aria-checked={i === hotelIdx}
+                          className={i === hotelIdx ? "is-active" : ""}
+                          onClick={() => setHotelIdx(i)}
+                        >
+                          <i aria-hidden="true" />
+                          <span>
+                            <b>{h.name}</b>
+                            <small>
+                              {h.city ? `${h.city} · ` : ""}{h.stars ? `${h.stars}★` : ""}
+                              {h.nights ? ` · ${h.nights} ${Number(h.nights) > 1 ? t("cal_nights") : t("cal_night")}` : ""}
+                            </small>
+                          </span>
+                          {prices.length > 0 && <em>{t("trips_from")} {fmt(Math.min(...prices))}</em>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              <h4 style={{ marginTop: 18 }}>{t("bk_rooms")}</h4>
+              <div className="mk-bk-roomgrid mk-bk-roomgrid--solo">
+                {roomTypes.map((rt) => {
+                  // Circuit : prix du type = somme des étapes.
+                  const price = stayHotels.reduce((a, h) => a + parsePrice(h.cols?.[rt.colIdx]), 0);
+                  if (!price) return null;
+                  const qty = rooms[rt.key] || 0;
+                  const full = stayHotels.some((h) => roomBlocked(h, rt, qty + 1));
+                  return (
+                    <div key={rt.key} className="mk-bk-room">
+                      <div>
+                        {/* DISPLAY ONLY — rooms[].type stays rt.label verbatim */}
+                        <b>{t("bk_room_label")} {rt.label}</b>
+                        <span>{fmt(price)} {t("bk_per_pax")} · {rt.paxPerRoom} {t("bk_room_per")}</span>
+                        {full && qty === 0 && <em className="mk-bk-full">{t("bk_room_full")}</em>}
                       </div>
-                      <i>{fmt(parsePrice(h.cols?.[0]))} <u>{t("bk_per_pax")}</u></i>
-                    </summary>
-                    <div className="mk-bk-roomgrid">
-                      {roomTypes.map((rt) => {
-                        const price = parsePrice(h.cols?.[rt.colIdx]);
-                        if (!price) return null;
-                        const qty = sel[rt.key] || 0;
-                        const full = roomBlocked(h, rt, qty + 1);
-                        return (
-                          <div key={rt.key} className="mk-bk-room">
-                            <div>
-                              {/* DISPLAY ONLY — rooms[].type stays rt.label verbatim */}
-                              <b>{t("bk_room_label")} {rt.label}</b>
-                              <span>{fmt(price)} {t("bk_per_pax")} · {rt.paxPerRoom} {t("bk_room_per")}</span>
-                              {full && qty === 0 && <em className="mk-bk-full">{t("bk_room_full")}</em>}
-                            </div>
-                            <div className="mk-bk-stepper">
-                              <button aria-label="−" disabled={qty === 0} onClick={() => setQty(hIdx, rt.key, -1)}>−</button>
-                              <b>{qty}</b>
-                              <button aria-label="+" disabled={full} title={full ? t("bk_room_full") : undefined} onClick={() => setQty(hIdx, rt.key, 1)}>+</button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      <div className="mk-bk-stepper">
+                        <button aria-label="−" disabled={qty === 0} onClick={() => setQty(rt.key, -1)}>−</button>
+                        <b>{qty}</b>
+                        <button aria-label="+" disabled={full} title={full ? t("bk_room_full") : undefined} onClick={() => setQty(rt.key, 1)}>+</button>
+                      </div>
                     </div>
-                  </details>
-                );
-              })}
-            </div>
-          </section>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           {suppList.length > 0 && (
             <section>
               <h4>{t("bk_supplements")}</h4>
-              <div className="mk-bk-supps">
-                {suppList.map((s) => (
-                  <button
-                    key={s.key}
-                    className={supp[s.key] ? "is-active" : ""}
-                    onClick={() => setSupp((p) => ({ ...p, [s.key]: !p[s.key] }))}
-                  >
-                    <i />
-                    <span>{s.label}</span>
-                    <b>+{fmt(s.pricePerPax)} {t("bk_per_pax")}</b>
-                  </button>
-                ))}
+              <p className="mk-bk-muted" style={{ marginTop: -4 }}>{t("bk_supp_hint")}</p>
+              <div className="mk-bk-suppqty">
+                {suppList.map((s) => {
+                  const q = suppQty(s.key);
+                  return (
+                    <div key={s.key} className={`mk-bk-supp ${q ? "is-active" : ""}`}>
+                      <div>
+                        <b>{s.label}</b>
+                        <span>+{fmt(s.pricePerPax)} {t("bk_per_pax")}{q ? ` · ${q} ${t("bk_travelers")}` : ""}</span>
+                      </div>
+                      <div className="mk-bk-stepper">
+                        <button aria-label="−" disabled={!q} onClick={() => setSupp((p) => ({ ...p, [s.key]: Math.max(0, q - 1) }))}>−</button>
+                        <b>{q}</b>
+                        <button aria-label="+" disabled={!totalPax || q >= totalPax} onClick={() => setSupp((p) => ({ ...p, [s.key]: Math.min(totalPax, q + 1) }))}>+</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
 
           {!canContinue && <p className="mk-bk-muted">{t(perPerson ? "bk_hint_pp" : "bk_hint")}</p>}
-          <button className="mk-btn mk-bk-next" disabled={!canContinue} onClick={() => setStep(2)}>
+          <button className="mk-btn mk-bk-next" disabled={!canContinue} onClick={() => { setStep(2); trackBookingStep({ targetId: pkg.$id, label: pkg.title || pkg.destination, step: "travelers", data: { totalPax, departure: selected?.from } }); }}>
             {t("bk_continue")} — {totalPax} {t("bk_travelers")}
           </button>
         </div>
@@ -473,21 +577,31 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
         <div className="mk-bk-form">
           <section>
             <h4>{t("bk_step2")}</h4>
+            <p className="mk-bk-muted" style={{ marginTop: -4 }}>
+              {passportMonths ? t("bk_passport_rule").replace("{months}", passportMonths) : t("bk_passport_later")}
+            </p>
             <div className="mk-bk-people">
-              {participants.map((p, i) => (
+              {people.map((p, i) => (
                 <fieldset key={i} className="mk-bk-person">
                   <legend>
                     {t("bk_participant")} {i + 1}
                     {i === 0 && <em> — {t("bk_lead")}</em>}
                   </legend>
                   <div className="mk-bk-fields">
+                    <select value={p.civility || ""} onChange={(e) => setP(i, "civility", e.target.value)} aria-label="Civilité">
+                      <option value="">Civilité</option>
+                      {CIVILITIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
                     <input placeholder={`${t("bk_fullname")}${i === 0 ? " *" : ""}`} value={p.fullName || ""} onChange={(e) => setP(i, "fullName", e.target.value)} />
                     <input placeholder={`${t("bk_phone")}${i === 0 ? " *" : ""}`} type="tel" value={p.phone || ""} onChange={(e) => setP(i, "phone", e.target.value)} />
                     {i === 0 && (
                       <input placeholder={t("bk_email_opt")} type="email" value={p.email || ""} onChange={(e) => setP(i, "email", e.target.value)} />
                     )}
-                    <input placeholder={t("bk_doc")} value={p.docNumber || ""} onChange={(e) => setP(i, "docNumber", e.target.value)} />
+                    <label className="mk-bk-datefield">Date de naissance<input type="date" value={p.birthDate || ""} onChange={(e) => setP(i, "birthDate", e.target.value)} /></label>
+                    <input placeholder={t("bk_doc")} value={p.passportNumber || ""} onChange={(e) => setP(i, "passportNumber", e.target.value)} />
+                    <label className="mk-bk-datefield">Expiration du passeport<input type="date" aria-invalid={!!passportErrors[i]} value={p.passportExpiry || ""} onChange={(e) => setP(i, "passportExpiry", e.target.value)} /></label>
                   </div>
+                  {passportErrors[i] && <p className="mk-bk-error" role="alert" style={{ margin: "8px 0 0" }}>⚠ {t("bk_passport_refused")} : {passportErrors[i]}.</p>}
                 </fieldset>
               ))}
             </div>
@@ -497,7 +611,7 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
 
           <div className="mk-bk-nav">
             <button className="mk-btn mk-btn--ghost mk-btn--sm" onClick={() => setStep(1)}>{t("bk_back")}</button>
-            <button className="mk-btn" disabled={!leadValid || sending} onClick={submit}>
+            <button className="mk-btn" disabled={!leadValid || !passportsOk || sending} onClick={submit}>
               {sending ? t("bk_sending") : t("bk_submit")}
             </button>
           </div>
@@ -507,24 +621,32 @@ export default function BookingFlow({ pkg, onClose, prefill, initialDateIdx = nu
     );
   }
 
-  return (
-    <div className="mk mk-bk-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mk-bk-panel" role="dialog" aria-modal="true">
-        <div className="mk-bk-head">
-          <div>
-            <span className="mk-eyebrow">{pkg.destination}{pkg.destinationAccent}</span>
-            {!done && (
-              <div className="mk-bk-steps">
-                <b className={step === 1 ? "is-on" : ""}>1 · {t("bk_step1")}</b>
-                <i />
-                <b className={step === 2 ? "is-on" : ""}>2 · {t("bk_step2")}</b>
-              </div>
-            )}
-          </div>
-          <button className="mk-bk-close" onClick={onClose} aria-label={t("bk_close")}>✕</button>
-        </div>
-        {body}
-      </div>
+  const steps = !done && (
+    <div className="mk-bk-steps">
+      <b className={step === 1 ? "is-on" : ""}>1 · {t("bk_step1")}</b>
+      <i />
+      <b className={step === 2 ? "is-on" : ""}>2 · {t("bk_step2")}</b>
     </div>
+  );
+
+  return (
+      <div className="mk mk-bk-page">
+        {!preview && <Header />}
+        <main className="mk-wrap mk-bk-pagein">
+          <button className="mk-bk-back" onClick={onClose}>
+            <span aria-hidden="true"><Arrow size={13} /></span>
+            {pkg.title || pkg.destination}
+          </button>
+          <div className="mk-bk-pagehead">
+            <div>
+              <span className="mk-eyebrow">{t("pk_book")}</span>
+              <h1 className="mk-h2">{pkg.destination}{pkg.destinationAccent}</h1>
+            </div>
+            {steps}
+          </div>
+          {body}
+        </main>
+        {!preview && <Footer />}
+      </div>
   );
 }

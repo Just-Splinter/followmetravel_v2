@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import Starter from './styles/Starter.jsx'
 import { EventsProvider } from './context/EventsContext.jsx'
+import { watchAppVersion } from './services/appVersion'
+
+// Onglets ouverts sur une ancienne version : rechargés à la prochaine page.
+watchAppVersion()
 
 // AppProvider used to wrap this tree. Its only remaining consumer was the
 // sidebar badge, and its state came from src/data/seed.js — mock packages and

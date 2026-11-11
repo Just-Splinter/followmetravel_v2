@@ -1,8 +1,0 @@
-{
-  "name": "create-reservation",
-  "type": "module",
-  "main": "src/main.js",
-  "dependencies": {
-    "node-appwrite": "^14.0.0"
-  }
-}

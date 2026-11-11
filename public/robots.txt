@@ -3,5 +3,6 @@ Allow: /
 Disallow: /dashboard
 Disallow: /login
 Disallow: /auth/
+Disallow: /profil
 
 Sitemap: https://www.followmetravel.ma/sitemap.xml

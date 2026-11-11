@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from "react";
-import db, { Collections, ID, Query, ADMIN_ONLY_PERMISSIONS } from "../services/database";
+import db, { Collections, ID, Query } from "../services/database";
 
 const MailContext = createContext(null);
 
@@ -31,8 +31,7 @@ export function MailProvider({ children }) {
             variables: JSON.stringify(template.variables || []),
             tags: JSON.stringify(template.tags || []),
           },
-          ID.unique(),
-          ADMIN_ONLY_PERMISSIONS
+          ID.unique()
         )
       ),
     [execute]

@@ -144,9 +144,9 @@
   font-size: 11px;
   font-weight: 500;
 }
-.badge-green  { background: #EAF3DE; color: #3B6D11; }
-.badge-amber  { background: #FAEEDA; color: #854F0B; }
-.badge-red    { background: #FCEBEB; color: #A32D2D; }
+.badge-green  { background: var(--adm-success-bg); color: var(--adm-success-fg); }
+.badge-amber  { background: var(--adm-warning-bg); color: var(--adm-warning-fg); }
+.badge-red    { background: var(--adm-danger-bg); color: var(--adm-danger-fg); }
 
 .cms-icon-btn {
   width: 28px; height: 28px;

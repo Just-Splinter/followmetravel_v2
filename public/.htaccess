@@ -1,0 +1,68 @@
+# Site public Follow Me Travel (cPanel / Apache) — généré avec le build Vite.
+# Les pages publiques sont pré-rendues (scripts/prerender.mjs) : chaque URL
+# propre est servie par son fichier .html, le reste par la coquille SPA.
+
+Options -MultiViews -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # HTTPS partout
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Domaine canonique : followmetravel.ma → www.followmetravel.ma
+  RewriteCond %{HTTP_HOST} ^followmetravel\.ma$ [NC]
+  RewriteRule ^ https://www.followmetravel.ma%{REQUEST_URI} [L,R=301]
+
+  # /page/ → /page (une seule URL par page)
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.+)/$ https://%{HTTP_HOST}/$1 [L,R=301]
+
+  # Accueil : index.html pré-rendu (DirectoryIndex)
+  RewriteRule ^$ - [L]
+
+  # Fichier réel (assets, images, sitemap…) : servi tel quel
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  # Script d'une ancienne version (supprimé) : petit script qui recharge la page
+  # depuis le serveur — les navigateurs restés sur l'ancien site en cache
+  # basculent d'eux-mêmes sur la nouvelle version.
+  RewriteRule ^assets/.+\.js$ /stale-asset.js [L]
+  # Autre fichier d'une ancienne version : vrai 404, jamais la page HTML à la place.
+  RewriteRule ^assets/ - [R=404,L]
+
+  # Page pré-rendue : /search → search.html, /voyages/<id>/<slug> → …/<slug>.html
+  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+  RewriteRule ^(.+)$ /$1.html [L]
+
+  # Tout le reste : application React (pages privées, voyages ajoutés depuis le build)
+  RewriteRule ^ /app.html [L]
+</IfModule>
+
+# Cache : HTML toujours revalidé, assets selon leur nature.
+<IfModule mod_headers.c>
+  # js/css : noms hachés par Vite (assets/) → immuables
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <Files "stale-asset.js">
+    Header set Cache-Control "no-store"
+  </Files>
+  # Images de public/ : même nom si remplacées → 7 jours
+  <FilesMatch "\.(avif|webp|jpe?g|png|svg|ico)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  <FilesMatch "\.(html|xml|txt|json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml application/xml text/plain
+</IfModule>

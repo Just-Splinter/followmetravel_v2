@@ -5,7 +5,7 @@ import {
   useCallback,
 } from "react";
 
-import db, { Collections, ID, Query, PUBLIC_CATALOG_PERMISSIONS } from "../services/database";
+import db, { Collections, ID, Query } from "../services/database";
 
 const PackageContext = createContext(null);
 
@@ -36,8 +36,7 @@ export function PackageProvider({ children }) {
           {
             ...pkg,
           },
-          ID.unique(),
-          PUBLIC_CATALOG_PERMISSIONS
+          ID.unique()
         )
       ),
     [execute]

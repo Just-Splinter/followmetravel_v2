@@ -627,7 +627,7 @@ function HelpText({ children }) {
 
 function CharCount({ val, max }) {
   const len = (val || '').length
-  return <span style={{ fontSize: 10, color: len > max * 0.85 ? 'var(--danger, #e74c3c)' : 'var(--text-muted)', textAlign: 'right' }}>{len}/{max}</span>
+  return <span style={{ fontSize: 10, color: len > max * 0.85 ? 'var(--danger, #dc2626)' : 'var(--text-muted)', textAlign: 'right' }}>{len}/{max}</span>
 }
 
 function ReviewCard({ title, icon, children, wide }) {
@@ -657,12 +657,12 @@ function AdPreview({ cfg }) {
       <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1877f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>f</div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 12, color: '#1a1a1a' }}>Follow Me Travel</div>
-          <div style={{ fontSize: 10, color: '#8a8a8a' }}>Sponsorisé · 🌍</div>
+          <div style={{ fontWeight: 600, fontSize: 12, color: '#0f172a' }}>Follow Me Travel</div>
+          <div style={{ fontSize: 10, color: '#64748b' }}>Sponsorisé · 🌍</div>
         </div>
       </div>
       {/* Text */}
-      <div style={{ padding: '0 12px 10px', fontSize: 13, color: '#1a1a1a', lineHeight: 1.4, whiteSpace: 'pre-line' }}>
+      <div style={{ padding: '0 12px 10px', fontSize: 13, color: '#0f172a', lineHeight: 1.4, whiteSpace: 'pre-line' }}>
         {cfg.adText || 'Votre texte ici…'}
       </div>
       {/* Image */}
@@ -671,10 +671,10 @@ function AdPreview({ cfg }) {
         : <div style={{ height: 160, background: '#f0ece3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: 12 }}>Image de l'annonce</div>
       }
       {/* CTA bar */}
-      <div style={{ padding: '10px 12px', background: '#f0f2f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '10px 12px', background: '#f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{cfg.headline || 'Titre'}</div>
-          <div style={{ fontSize: 11, color: '#8a8a8a' }}>{cfg.description || new URL(cfg.destinationUrl || 'https://x.com').hostname}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{cfg.headline || 'Titre'}</div>
+          <div style={{ fontSize: 11, color: '#64748b' }}>{cfg.description || new URL(cfg.destinationUrl || 'https://x.com').hostname}</div>
         </div>
         <div style={{ background: '#1877f2', color: '#fff', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
           {CTA_TYPES.find(c => c.value === cfg.ctaType)?.label || 'En savoir +'}

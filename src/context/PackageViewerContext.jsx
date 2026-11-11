@@ -5,7 +5,8 @@ import {
   useCallback,
 } from "react";
 
-import db, { Collections, ID, Query, PUBLIC_PACKAGE_STATUSES } from "../services/database";
+import db, { Collections, ID, Query } from "../services/database";
+import { isPubliclyVisible } from "../services/siteDocs";
 
 const PackageContext = createContext(null);
 
@@ -76,7 +77,7 @@ export function PackageViewerProvider({ children }) {
         // guessed or bookmarked link to unpublished content reveals nothing.
         // Preview mode in the package editor never goes through fetchById —
         // it renders previewDoc directly — so this doesn't affect that.
-        if (!PUBLIC_PACKAGE_STATUSES.includes(doc?.status)) {
+        if (!isPubliclyVisible(doc)) {
           setSelectedPkg(null);
           return null;
         }

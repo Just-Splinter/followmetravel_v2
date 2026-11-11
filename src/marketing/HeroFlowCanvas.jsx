@@ -164,7 +164,7 @@ export default function HeroFlow({ slides, active, onReady, onFail }) {
     };
     stRef.current = st;
 
-    // textures — Appwrite storage needs CORS; any failure keeps the DOM hero.
+    // textures — the media storage (MinIO) needs CORS; any failure keeps the DOM hero.
     // `glx` cache-buster: the DOM hero caches these URLs from no-cors <img>
     // requests, and that cache entry (no ACAO stored) poisons CORS loads.
     const loader = new THREE.TextureLoader();

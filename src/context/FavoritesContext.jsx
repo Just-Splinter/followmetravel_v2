@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { getPrefs, updatePrefs } from "../services/appwrite";
+import { getPrefs, updatePrefs } from "../services/account";
 import { useAuth } from "./AuthContext";
 import { useEvents } from "./EventsContext";
 

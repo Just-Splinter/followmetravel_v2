@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import styles from "../styles/Login.module.css";
-import { confirmPasswordRecovery } from "../services/appwrite";
+import { confirmPasswordRecovery } from "../services/account";
 
-// Landing page for the link Appwrite emails out after requestPasswordRecovery
+// Landing page for the link the API emails out after requestPasswordRecovery
 // (LoginPage's "Mot de passe oublié ?" flow) — userId/secret are appended to
-// the URL by Appwrite itself, not something this app generates.
+// the URL by the API (api/src/auth/auth.service.ts), valid for one hour.
 export default function AuthRecovery() {
   const [searchParams] = useSearchParams();
   const userId = searchParams.get("userId");

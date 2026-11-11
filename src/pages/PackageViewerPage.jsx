@@ -6,6 +6,7 @@ import { ReservationProvider } from "../context/ReservationContext";
 import { useEvents } from "../context/EventsContext";
 import { useAuth } from "../context/AuthContext";
 import '../styles/PackageViewerPage.css'
+import { formuleNights } from "../services/formules";
 
 
 // ─── Itinerary Timeline Component (Left-Aligned) ───────────────────
@@ -219,9 +220,7 @@ function GallerySection({ pkg }) {
 }
 
 // ─── Hotel Categories Preview (formules dynamiques) ────────────────
-function hotelCategoryNights(category) {
-  return (category.hotels || []).reduce((sum, h) => sum + (Number(h.nights) || 0), 0);
-}
+const hotelCategoryNights = formuleNights;
 
 function HotelCategoriesPreview({ pkg, th }) {
   const categories = pkg.hotelCategories || [];

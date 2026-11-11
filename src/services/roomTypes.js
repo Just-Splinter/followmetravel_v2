@@ -15,7 +15,7 @@ const PRICE_COL_START = 4;
 
 // "2–5 ans" (en dash) / "2-5 ans" (hyphen) / " Triple " must all match the
 // same classic type — headers are free text typed by an admin.
-const normLabel = (s) =>
+export const normLabel = (s) =>
   String(s ?? "")
     .replace(/[–—]/g, "-")
     .replace(/\s+/g, " ")

@@ -118,7 +118,7 @@ export default function AddClientModal({ open, onClose, onCreate, notify }) {
 
           {error && <p style={{ color: "#dc2626", fontSize: 12, marginTop: 8 }}>{error}</p>}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+          <div className="adm-modal-footer">
             <button
               type="button"
               onClick={onClose}

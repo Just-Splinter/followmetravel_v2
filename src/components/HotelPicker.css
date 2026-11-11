@@ -14,9 +14,9 @@
 
 .hp-input {
   background: #fff;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--adm-line);
   border-radius: 9px;
-  color: #1e293b;
+  color: var(--adm-text);
   font-family: inherit;
   font-size: 13px;
   padding: 10px 13px;
@@ -24,7 +24,7 @@
   transition: all 0.2s;
 }
 .hp-input:focus {
-  border-color: #ff750e;
+  border-color: var(--adm-brand);
   box-shadow: 0 0 0 3px rgba(255, 117, 14, 0.1);
 }
 
@@ -35,7 +35,7 @@
   right: 0;
   z-index: 50;
   background: #fff;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--adm-line);
   border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   max-height: 220px;
@@ -52,14 +52,14 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #1e293b;
+  color: var(--adm-text);
   font-size: 12.5px;
   cursor: pointer;
   text-align: left;
   font-family: inherit;
 }
 .hp-item:hover {
-  background: #fff4ec;
+  background: var(--adm-brand-soft);
 }
 .hp-item-name {
   flex: 1;
@@ -69,7 +69,7 @@
 }
 .hp-item-meta {
   flex-shrink: 0;
-  color: #94a3b8;
+  color: var(--adm-subtle);
   font-style: normal;
   font-size: 10.5px;
 }
@@ -84,7 +84,7 @@
   padding: 8px 10px;
 }
 .hp-wrap--dark .hp-input:focus {
-  border-color: #f59e42;
+  border-color: var(--adm-brand);
   box-shadow: none;
 }
 .hp-wrap--dark .hp-pop {
@@ -101,3 +101,11 @@
 .hp-wrap--dark .hp-item-meta {
   color: #5a7a94;
 }
+
+/* Tout le catalogue peut s'afficher : liste défilante. */
+.hp-pop { max-height: 280px; overflow-y: auto; }
+.hp-empty { padding: 10px 12px; font-size: 12.5px; color: var(--adm-muted); line-height: 1.5; }
+.hp-empty a { color: var(--adm-brand); font-weight: 600; }
+.hp-wrap--dark .hp-empty { color: var(--adm-subtle); }
+/* Coche « relié au catalogue » dans le champ. */
+.hp-linked { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--adm-success); pointer-events: none; }

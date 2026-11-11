@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLocale } from "./i18n";
 import { LangSwitcher } from "./ui";
+import { useUnreadMessages } from "../services/inboxUnread";
 
 export default function Header({ light = false }) {
   const { t } = useLocale();
@@ -33,10 +34,12 @@ export default function Header({ light = false }) {
   ];
 
   const authLabel = loading ? "…" : user ? (user.name || user.email).split(/[ @]/)[0] : t("nav_signin");
+  // Messages non lus de l'agence : pastille sur le nom, et accès direct à la boîte de réception.
+  const unread = useUnreadMessages(user);
   const onAuth = () => {
     if (loading) return;
     if (!user) navigate("/login");
-    else navigate("/profil#reservations");
+    else navigate(unread ? "/profil#inbox" : "/profil#reservations");
   };
 
   const go = (href) => {
@@ -78,6 +81,9 @@ export default function Header({ light = false }) {
               <span className="mk-hide-mobile"><LangSwitcher /></span>
               <button className="mk-nav-auth mk-hide-mobile" onClick={onAuth} style={{ fontSize: 13.5, fontWeight: 500 }}>
                 {authLabel}
+                {unread > 0 && (
+                  <span className="mk-pf-badge" aria-label={`${unread} ${t("pf_tab_inbox")}`}>{unread}</span>
+                )}
               </button>
               {user && user.labels?.includes("admin") && (
                 <button className="mk-btn mk-hide-mobile"  onClick={()=> navigate('/dashboard/home')} style={{ fontSize: 13.5, fontWeight: 500 }}>

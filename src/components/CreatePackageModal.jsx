@@ -14,10 +14,10 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
-  { value: "draft", label: "Brouillon", bg: "#fef9c3", text: "#854d0e", dot: "#ca8a04" },
-  { value: "published", label: "Publié", bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
-  { value: "active", label: "Actif", bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
-  { value: "archived", label: "Archivé", bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
+  { value: "draft", label: "Brouillon", bg: "#fffbeb", text: "#92400e", dot: "#d97706" },
+  { value: "published", label: "Publié", bg: "#f0fdf4", text: "#15803d", dot: "#16a34a" },
+  { value: "active", label: "Actif", bg: "#eff6ff", text: "#1d4ed8", dot: "#2563eb" },
+  { value: "archived", label: "Archivé", bg: "#f1f5f9", text: "#64748b", dot: "#94a3b8" },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -424,6 +424,9 @@ export default function CreatePackageModal({ pkg, onClose, onCreated }) {
         tours: form.tours,
         adventures: form.adventures,
         basePrice: parseFloat(form.basePrice) || 0,
+        publishAt: form.publishAt || "",
+        unpublishAt: form.unpublishAt || "",
+        featured: !!form.featured,
         data: JSON.stringify(dataBlob),
       };
       if (pkg?.$id) {
@@ -439,6 +442,9 @@ export default function CreatePackageModal({ pkg, onClose, onCreated }) {
           tours: form.tours,
           adventures: form.adventures,
           basePrice: parseFloat(form.basePrice) || 0,
+          publishAt: form.publishAt || "",
+          unpublishAt: form.unpublishAt || "",
+          featured: !!form.featured,
           data: undefined, // on ne met pas à jour la data lors de l'édition rapide, pour éviter d'écraser les changements faits dans l'éditeur complet
         });
         toast.success("Package mis à jour avec succès.");
@@ -512,6 +518,18 @@ export default function CreatePackageModal({ pkg, onClose, onCreated }) {
                 <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 8, height: 8, borderRadius: "50%", background: currentStatus.dot, pointerEvents: "none" }} />
                 <i className="ti ti-chevron-down" style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: "var(--color-text-tertiary)", pointerEvents: "none" }} />
               </div>
+            </Field>
+            <Field label="En ligne à partir du" hint="Vide : dès que le statut est Actif / Publié">
+              <input type="date" value={form.publishAt || ""} onChange={e => set("publishAt", e.target.value)} style={S.input} />
+            </Field>
+            <Field label="Retiré du site le" hint="Vide : pas de fin programmée">
+              <input type="date" value={form.unpublishAt || ""} onChange={e => set("unpublishAt", e.target.value)} style={S.input} />
+            </Field>
+            <Field label="Page d'accueil" hint="Mis en avant en tête de l'accueil (carrousel et sélection)">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, minHeight: 38, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!form.featured} onChange={e => set("featured", e.target.checked)} />
+                À la une
+              </label>
             </Field>
             <Field label="Prix de base (DH)">
               <div style={{ position: "relative" }}>
@@ -628,7 +646,7 @@ export default function CreatePackageModal({ pkg, onClose, onCreated }) {
         <div style={S.footer}>
           <span style={S.footerHint}>
             <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
-            Les champs <span style={{ color: "#ef4444" }}>*</span> sont obligatoires
+            Les champs <span style={{ color: "#dc2626" }}>*</span> sont obligatoires
           </span>
           <button onClick={onClose} style={S.btnCancel}>Annuler</button>
           <button
@@ -650,12 +668,12 @@ export default function CreatePackageModal({ pkg, onClose, onCreated }) {
 function Field({ label, children, error, hint }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontSize: 12, fontWeight: 500, color: error ? "#ef4444" : "var(--color-text-secondary)" }}>
+      <label style={{ fontSize: 12, fontWeight: 500, color: error ? "#dc2626" : "var(--color-text-secondary)" }}>
         {label}
       </label>
       {children}
       {hint && (
-        <p style={{ fontSize: 11, color: error ? "#ef4444" : "var(--color-text-tertiary)", margin: 0 }}>
+        <p style={{ fontSize: 11, color: error ? "#dc2626" : "var(--color-text-tertiary)", margin: 0 }}>
           {hint}
         </p>
       )}
@@ -803,7 +821,7 @@ const S = {
     color: "var(--color-text-primary)",
     outline: "none",
   },
-  inputError: { borderColor: "#fca5a5", background: "#fff1f2" },
+  inputError: { borderColor: "#fecaca", background: "#fef2f2" },
 
   // Category buttons
   catRow: { display: "flex", gap: 8 },

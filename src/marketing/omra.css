@@ -175,43 +175,6 @@
   letter-spacing: 0;
   font-size: 15px;
 }
-.om-hero-cue {
-  position: absolute;
-  z-index: 2;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  color: var(--om-cream-2);
-  font-size: 10.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-[dir="rtl"] .om .om-hero-cue {
-  letter-spacing: 0;
-  text-transform: none;
-  font-size: 12.5px;
-}
-.om-hero-cue i {
-  width: 1px;
-  height: 56px;
-  background: rgba(236, 228, 210, 0.2);
-  position: relative;
-  overflow: hidden;
-}
-.om-hero-cue i::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: -40%;
-  width: 100%;
-  height: 40%;
-  background: var(--om-gold);
-  animation: omCue 2.6s var(--ease, ease) infinite;
-}
 @keyframes omCue {
   to { top: 110%; }
 }
@@ -904,22 +867,6 @@
 }
 
 /* ── Reservation modal — the tent at night ────────────────────────────────── */
-.om-bk-ov {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgba(6, 8, 16, 0.82);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-@media (min-width: 760px) {
-  .om-bk-ov {
-    align-items: center;
-    padding: 30px;
-  }
-}
 .om-bk {
   background: #fffdf9;
   color: var(--ink, #1b1713);
@@ -963,21 +910,6 @@
 }
 [dir="ltr"] .om-bk-head h3 em {
   text-align: left;
-}
-.mk .om-bk-x {
-  border: 1px solid rgba(164, 129, 61, 0.4);
-  background: transparent;
-  color: var(--ink, #1b1713);
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 15px;
-  flex: 0 0 auto;
-  transition: background 250ms ease;
-}
-.mk .om-bk-x:hover {
-  background: rgba(164, 129, 61, 0.12);
 }
 .om-bk-body {
   overflow: auto;
@@ -1353,14 +1285,12 @@
 /* motion hygiene */
 .mk--flat .om-hero-bg img,
 .mk--flat .om-stars i,
-.mk--flat .om-hero-cue i::after,
 .mk--flat .om-band img {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .om-hero-bg img,
   .om-stars i,
-  .om-hero-cue i::after,
   .om-band img {
     animation: none;
   }
@@ -1425,9 +1355,6 @@
 }
 .om-hero-sub {
   animation: omFadeUp 800ms var(--ease, ease) 1350ms both;
-}
-.om-hero-cue {
-  animation: omFadeUp 900ms var(--ease, ease) 1750ms both;
 }
 /* vast, slowly turning geometry behind the calligraphy */
 .om-hero-orn {
@@ -1566,7 +1493,6 @@
 .mk--flat .om-hero .om-div,
 .mk--flat .om-hero-title,
 .mk--flat .om-hero-sub,
-.mk--flat .om-hero-cue,
 .mk--flat .om-hero-orn,
 .mk--flat .om-niyya-medallion,
 .mk--flat .om-thread i,
@@ -1587,7 +1513,6 @@
   .om-hero .om-div,
   .om-hero-title,
   .om-hero-sub,
-  .om-hero-cue,
   .om-hero-orn,
   .om-niyya-medallion,
   .om-thread i,
@@ -1602,4 +1527,305 @@
   .om-thread i { transform: scaleY(1); }
   .om-arch-frame path,
   .om-inc-cell svg path { stroke-dashoffset: 0; }
+}
+
+/* ── Réservation Omra en page ── */
+.om-bk--page {
+  max-width: none;
+  max-height: none;
+  border-radius: 16px;
+  overflow: visible;
+}
+.om-bk--page .om-bk-body {
+  overflow: visible;
+}
+.om-bk--page .om-bk-main {
+  overflow: visible;
+}
+.om-bk--page .om-bk-head h1 {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: clamp(28px, 3.6vw, 40px);
+  line-height: 1.1;
+  margin: 0;
+}
+.om-bk--page .om-bk-head h1 em {
+  display: block;
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: 17px;
+  color: var(--om-gold-deep);
+  margin-top: 4px;
+  direction: rtl;
+}
+[dir="ltr"] .om-bk--page .om-bk-head h1 em {
+  text-align: left;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT v2 — page Omra : même nuit, même or, même calligraphie ;
+   seule la disposition change (hero + carte, chapitres côte à côte,
+   inclusions puis forfaits en cartes, appel final en panneau).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.om-wrap {
+  max-width: 1200px;
+  padding-inline: 16px;
+}
+@media (min-width: 768px) {
+  .om-wrap {
+    padding-inline: 24px;
+  }
+}
+
+/* ── Hero : texte à gauche, carte « Prochain départ » à droite ── */
+.om-hero {
+  justify-content: stretch;
+  text-align: start;
+}
+.om-hero-grid {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding-block: 104px 72px;
+}
+.om-hero-grid .om-hero-in {
+  flex: 1 1 420px;
+  max-width: 640px;
+  padding: 0;
+}
+.om-hero-grid .om-div {
+  justify-content: flex-start;
+}
+.om-hero-actions {
+  justify-content: flex-start;
+  margin-top: 28px;
+}
+.mk .om-hero-card {
+  flex: 0 1 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid var(--om-gold-line);
+  border-radius: 16px;
+  background: rgba(8, 10, 20, 0.62);
+  backdrop-filter: blur(10px);
+  color: var(--om-cream);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 300ms ease;
+}
+.mk .om-hero-card:hover {
+  border-color: var(--om-gold);
+}
+.om-hero-card-ttl {
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+}
+.om-hero-card em {
+  font-style: normal;
+  font-family: var(--om-arabic);
+  font-size: 18px;
+  color: var(--om-gold);
+  direction: rtl;
+}
+.om-hero-card-date {
+  font-size: 13.5px;
+  color: var(--om-cream-2);
+}
+.om-hero-card-nights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.om-hero-card-nights > span {
+  padding: 8px 10px;
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--om-cream-2);
+}
+.om-hero-card-nights b {
+  display: block;
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--om-cream);
+}
+.om-hero-card-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(201, 169, 97, 0.25);
+  font-size: 12.5px;
+  color: var(--om-cream-2);
+}
+.om-hero-card-foot b {
+  display: block;
+  font-family: var(--serif, serif);
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--om-cream);
+}
+.om-hero-card .mk-roundgo {
+  background: var(--om-gold);
+  color: #14100a;
+}
+
+/* ── Chapitres : texte et arches côte à côte, en alternance ── */
+.om-chap {
+  padding: 72px 0;
+}
+@media (min-width: 900px) {
+  .om-chap {
+    padding: 96px 0;
+  }
+}
+.om-chap-grid {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+}
+@media (min-width: 1000px) {
+  .om-chap-grid {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 56px;
+  }
+  .om-chap-grid--rev {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+  .om-chap-grid--rev .om-chap-head {
+    order: 2;
+  }
+}
+.om-chap-grid .om-chap-head {
+  max-width: none;
+  margin: 0;
+  padding-inline: 0;
+  text-align: start;
+}
+.om-chap-grid .om-chap-ar {
+  font-size: clamp(40px, 5.4vw, 72px);
+}
+.om-chap-grid .om-thread,
+.om-sec-head .om-thread,
+.om-packs-head .om-thread {
+  margin-inline: 0;
+}
+.om-chap-grid .om-arches {
+  margin-inline: 0;
+}
+
+/* ── Inclusions en cartes ── */
+.om-inc {
+  padding: 72px 0;
+}
+.om-sec-head,
+.om-packs-head {
+  text-align: start;
+}
+.om-inc-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+  background: none;
+  border: 0;
+}
+.om-inc-cell {
+  border: 1px solid rgba(164, 129, 61, 0.3);
+  border-radius: 14px;
+  background: #fffdf9;
+}
+
+/* ── Forfaits en grille de cartes (un seul forfait : pleine largeur) ── */
+.om-packs {
+  padding: 72px 0 96px;
+}
+.om-packs-head {
+  margin-bottom: 40px;
+}
+.om-packs-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 32px;
+}
+@media (min-width: 900px) {
+  .om-packs-list:has(> :nth-child(2)) .om-pack {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Appel final en panneau ── */
+.om-cta-sec {
+  background: var(--paper, #f6f2ea);
+  padding: 0 0 72px;
+}
+.om-cta {
+  border-radius: 18px;
+  padding: 56px 28px;
+  text-align: start;
+}
+@media (min-width: 900px) {
+  .om-cta {
+    padding: 72px 56px;
+  }
+}
+.om-cta::before {
+  background: linear-gradient(rgba(10, 13, 24, 0.66), rgba(10, 13, 24, 0.66));
+}
+.om-cta-in {
+  display: grid;
+  gap: 0 40px;
+}
+.om-cta-in > * {
+  grid-column: 1;
+}
+.om-cta p {
+  margin-inline: 0;
+}
+@media (min-width: 900px) {
+  .om-cta-in {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .om-cta-in .om-cta-row {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: end;
+  }
+}
+.om-cta-row {
+  justify-content: flex-start;
+}
+
+/* titres arabes alignés avec leur colonne (pages LTR) */
+[dir="ltr"] .om-packs-head .om-word,
+[dir="ltr"] .om-sec-head .om-word,
+[dir="ltr"] .om-chap-grid .om-chap-ar,
+[dir="ltr"] .om-cta .om-word {
+  text-align: left;
+}
+
+/* appel final : photo, puis voile, puis texte */
+.om-cta > img {
+  z-index: 0;
+}
+.om-cta::before {
+  z-index: 1;
+}
+.om-cta-in {
+  z-index: 2;
+}
+
+[dir="ltr"] .om-hero-grid .om-talbiyah {
+  text-align: left;
 }

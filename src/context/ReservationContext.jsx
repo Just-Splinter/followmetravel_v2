@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import db, { Collections, Query, ID } from "../services/database";
 import { useAuth } from "./AuthContext";
-import functionService from "../services/functions";
-import { sendTriggerEmail, buildReservationParams } from "../services/emailSender";
+import { request } from "../services/api";
+import { sendTriggerEmail } from "../services/emailSender";
 
 const ReservationContext = createContext(null);
 
@@ -37,37 +37,20 @@ export function ReservationProvider({ children }) {
       execute(async () => {
         requireAuth();
 
-        const result = await functionService.execute('6a312ae3000737bbe2ac', {
-          userId: user.$id,
-          userEmail: user.email,
-          userName: user.name,
-          status: "pending",
-          $createdAt: new Date().toISOString(),
-          ...payload,
-        });
-
-        // Notification emails are a side effect, never awaited and never
-        // allowed to fail the booking itself — see emailSender.js. Only
-        // fires if the admin turned the trigger on in Paramètres and picked
-        // a template (Notifications tab).
-        if (result?.success && result?.reservation) {
-          const params = buildReservationParams(result.reservation);
-          const clientEmail = result.reservation.userEmail || user.email;
-          sendTriggerEmail("reservation_created_client", { params, targetEmails: [clientEmail] });
-          sendTriggerEmail("reservation_created_admin", { params });
-        }
-
-        return result;
+        // L'API vérifie le captcha, recalcule le prix, prend l'identité du
+        // client dans la session, et envoie elle-même les emails
+        // reservation_created_client / _admin s'ils sont activés.
+        return request("POST", "/v1/reservations", { body: { userName: user.name, ...payload } });
       }),
     [execute, requireAuth, user]
   );
 
   // ── Créer une réservation depuis le dashboard (téléphone, agence…) ──
-  // Skips the public Appwrite Function entirely — no recaptcha token to
-  // verify, and the price doesn't need the server-side recompute that
-  // function does for public submissions, since an admin typing the total
-  // in is already the trusted source (there's no "client" to distrust
-  // here). Writes straight to the collection like the function does.
+  // Skips the public POST /v1/reservations entirely — no recaptcha token to
+  // verify, and the price doesn't need the server-side recompute it does
+  // for public submissions, since an admin typing the total in is already
+  // the trusted source (there's no "client" to distrust here). Writes
+  // straight to the collection (admin only, enforced by the API).
   const createReservationAdmin = useCallback(
     (payload) =>
       execute(async () => {
@@ -89,8 +72,7 @@ export function ReservationProvider({ children }) {
         setReservations((prev) => [reservation, ...prev]);
 
         if (reservation.userEmail) {
-          const params = buildReservationParams(reservation);
-          sendTriggerEmail("reservation_created_client", { params, targetEmails: [reservation.userEmail] });
+          sendTriggerEmail("reservation_created_client", { reservationId: reservation.$id });
         }
 
         return { success: true, reservation };
@@ -177,15 +159,11 @@ export function ReservationProvider({ children }) {
           prev.map((r) => (r.$id === id ? { ...r, ...result } : r))
         );
 
-        const original = reservations.find((r) => r.$id === id);
-        sendTriggerEmail("reservation_cancelled", {
-          params: buildReservationParams({ ...original, ...result }),
-          targetEmails: [original?.userEmail || user?.email].filter(Boolean),
-        });
+        sendTriggerEmail("reservation_cancelled", { reservationId: id });
 
         return result;
       }),
-    [execute, requireAuth, reservations, user]
+    [execute, requireAuth]
   );
 
   return (

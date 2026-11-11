@@ -1,7 +1,10 @@
+import "../services/adminAssets";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { login, logout, requestPasswordRecovery } from "../services/appwrite";
+import { login, logout, requestPasswordRecovery } from "../services/account";
+import { useEvents } from "../context/EventsContext";
+import { isStaff } from "../services/roles";
 import "../marketing/marketing.css";
 
 /** Espace équipe — the dashboard sign-in, in the house style. */
@@ -11,6 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user, loading: authLoading, refreshUser, loginWithGoogle } = useAuth();
+  const { trackAuth, setUserId } = useEvents();
 
   // Appwrite refuses to open a second session on top of an existing one
   // ("Creation of a session is prohibited when a session is active") — the
@@ -44,9 +48,9 @@ export default function LoginPage() {
       await requestPasswordRecovery(recoveryEmail.trim(), `${window.location.origin}/auth/recovery`);
       setRecoverySent(true);
     } catch (err) {
-      // Appwrite refuses recovery for an unknown email with a 401 — surfacing
-      // that would let anyone probe which addresses have an account, so this
-      // always shows the same "check your inbox" outcome either way.
+      // The API already answers the same way for unknown emails; any error
+      // here is still swallowed so the outcome never reveals which addresses
+      // have an account.
       console.error(err);
       setRecoverySent(true);
     } finally {
@@ -90,7 +94,12 @@ export default function LoginPage() {
         await logout();
         await login(form.email, form.password);
       }
-      await refreshUser();
+      const u = await refreshUser();
+      // Connexions clients seulement (le trafic de l'équipe n'entre pas dans les statistiques).
+      if (u && !isStaff(u)) {
+        setUserId(u.$id);
+        trackAuth({ action: "login", method: "email" });
+      }
       navigate("/");
     } catch (err) {
       console.error(err);

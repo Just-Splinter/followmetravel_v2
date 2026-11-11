@@ -1,0 +1,15 @@
+/* Fiches de synthèse de la modale de détail commune (package, hôtel, client) */
+.qv { display: flex; flex-direction: column; gap: 6px; }
+.qv-head { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
+.qv-head h2 { margin: 0; font-size: 20px; font-weight: 800; color: var(--adm-ink); }
+.qv-head p { margin: 4px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.qv-head a { color: var(--adm-brand); }
+.qv-cover { width: 120px; height: 84px; object-fit: cover; border-radius: var(--adm-radius); border: 1px solid var(--adm-line); flex-shrink: 0; }
+.qv-avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--adm-brand-soft); color: var(--adm-brand); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.qv-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 8px; }
+.qv-facts div { background: var(--adm-bg); border: 1px solid var(--adm-line); border-radius: var(--adm-radius); padding: 10px 12px; }
+.qv-facts dt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--adm-muted); }
+.qv-facts dd { margin: 4px 0 0; font-size: 14px; font-weight: 700; color: var(--adm-text); }
+.qv-h { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--adm-ink); margin: 16px 0 6px; }
+.qv-line { margin: 0 0 4px; font-size: 13px; color: var(--adm-text-2); }
+.qv-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--adm-line); }

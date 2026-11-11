@@ -1,22 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useReservation } from "../context/ReservationContext";
 import { useEvents } from "../context/EventsContext";
 import { useLocale } from "./i18n";
+import Header from "./Header";
+import { Footer } from "./Sections";
+import { Arrow } from "./ui";
 
 /**
  * Omra reservation — occupancy-based per-person pricing (quad/triple/double),
- * optional child fare. The payload sent to the Appwrite Function is the exact
+ * optional child fare. The payload sent to POST /v1/reservations is the exact
  * legacy reservation contract (same keys as BookingFlow): the occupancy
  * selection is expressed as one synthetic "hotel" whose rooms are the
  * occupancy lines, so admin/profile UIs render it unchanged.
+ *
+ * Page à part (route /omra/reserver/:id) — plus de fenêtre modale.
+ * onClose : retour à la page Omra.
  */
 export default function OmraBooking({ pkg, onClose }) {
   const { t, locale } = useLocale();
+  const navigate = useNavigate();
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const { createReservation } = useReservation();
-  const { trackPayment, trackAbandon } = useEvents();
+  const { trackPayment, trackAbandon, trackBookingStep } = useEvents();
   const { executeRecaptcha } = useGoogleReCaptcha();
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
   const fmt = (n) => `${nf.format(n)} DH`;
@@ -50,17 +58,6 @@ export default function OmraBooking({ pkg, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const lines = pricing
     .map((p) => ({ ...p, n: qty[p.key || p.label] || 0, subtotal: (qty[p.key || p.label] || 0) * Number(p.price) }))
     .filter((l) => l.n > 0);
@@ -71,7 +68,10 @@ export default function OmraBooking({ pkg, onClose }) {
   const canContinue = dateIdx !== null && adultPax > 0;
 
   /* pilgrim rows derived from the pax count — state only stores what was typed */
-  const pilgrims = Array.from({ length: Math.max(totalPax, 1) }, (_, i) => participants[i] || {});
+  // Pèlerin 1 (contact principal) : nom et email du compte connecté par défaut.
+  const pilgrims = Array.from({ length: Math.max(totalPax, 1) }, (_, i) =>
+    i === 0 && user ? { fullName: user.name || "", email: user.email || "", ...(participants[0] || {}) } : participants[i] || {}
+  );
 
   const bump = (key, delta) =>
     setQty((prev) => ({ ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) }));
@@ -89,15 +89,15 @@ export default function OmraBooking({ pkg, onClose }) {
     if (!leadValid || sending) return;
     setSending(true);
     setError(null);
+    trackBookingStep({ targetId: pkg.$id, label: pkg.title, step: "submit", data: { totalPax } });
     try {
       const d = dates[dateIdx];
       const roomLines = lines.map((l) => ({ type: l.label, qty: l.n }));
       if (children > 0) roomLines.push({ type: t("om_pk_child"), qty: children });
       const packageTitle = pkg.title || `Omra ${pkg.year || ""}`.trim();
       // See the matching comment in BookingFlow.jsx's submit(): totalEstimate
-      // (grandTotal) below is client-computed and forwarded as-is to Appwrite
-      // Function '6a312ae3000737bbe2ac' — server-side price validation, if
-      // any, lives entirely in that function's own source, outside this repo.
+      // (grandTotal) below is client-computed; the API recomputes the price
+      // server-side (api/src/reservations/pricing.ts).
       const result = await createReservation({
         packageId: pkg.$id,
         packageTitle,
@@ -129,9 +129,11 @@ export default function OmraBooking({ pkg, onClose }) {
       });
       if (!result?.success) {
         setError(result?.message || t("bk_err"));
+        trackBookingStep({ targetId: pkg.$id, label: pkg.title, step: "error", data: { message: result?.message || "" } });
         return;
       }
       setDone(result.reservation || {});
+      trackBookingStep({ targetId: pkg.$id, label: pkg.title, step: "success", data: { totalEstimate: grandTotal, totalPax } });
       trackPayment({
         targetId: pkg.$id,
         label: packageTitle,
@@ -139,6 +141,7 @@ export default function OmraBooking({ pkg, onClose }) {
       });
     } catch (err) {
       setError(err?.message === "AUTH_REQUIRED" ? t("bk_auth_t") : err?.message || t("bk_err"));
+      trackBookingStep({ targetId: pkg.$id, label: pkg.title, step: "error", data: { message: err?.message || "" } });
     } finally {
       setSending(false);
     }
@@ -146,17 +149,24 @@ export default function OmraBooking({ pkg, onClose }) {
 
   /* ── shells ── */
   const shell = (children) => (
-    <div className="om-bk-ov" onClick={onClose}>
-      <div className="om om-bk" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="om-bk-head">
-          <h3>
-            {pkg.title}
-            <em lang="ar">{pkg.titleAr || "عُمْرَة"}</em>
-          </h3>
-          <button className="om-bk-x" onClick={onClose} aria-label={t("bk_close")}>✕</button>
+    <div className="mk om-bk-page">
+      <Header />
+      <main className="mk-wrap mk-bk-pagein">
+        <button className="mk-bk-back" onClick={onClose}>
+          <span aria-hidden="true"><Arrow size={13} /></span>
+          {t("nav_omra")}
+        </button>
+        <div className="om om-bk om-bk--page">
+          <div className="om-bk-head">
+            <h1>
+              {pkg.title}
+              <em lang="ar">{pkg.titleAr || "عُمْرَة"}</em>
+            </h1>
+          </div>
+          {children}
         </div>
-        {children}
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 
@@ -180,7 +190,10 @@ export default function OmraBooking({ pkg, onClose }) {
         <h3>{t("om_bk_ok_t")}</h3>
         {done.ref && <div className="om-bk-ref">{done.ref}</div>}
         <p>{t("bk_ok_d")}</p>
-        <button className="mk-btn mk-btn--sm" onClick={onClose}>{t("bk_close")}</button>
+        <div className="mk-bk-done-actions">
+          <button className="mk-btn mk-btn--sm" onClick={() => navigate("/profil#reservations")}>{t("nav_bookings")}</button>
+          <button className="mk-btn mk-btn--sm mk-btn--ghost" onClick={onClose}>{t("bk_back")}</button>
+        </div>
       </div>
     );
   }
@@ -219,7 +232,7 @@ export default function OmraBooking({ pkg, onClose }) {
           <button className="om-bk-ghost" onClick={() => setStep(1)}>{t("bk_back")}</button>
         )}
         {step === 1 ? (
-          <button className="om-bk-next" disabled={!canContinue} onClick={() => setStep(2)}>
+          <button className="om-bk-next" disabled={!canContinue} onClick={() => { setStep(2); trackBookingStep({ targetId: pkg.$id, label: pkg.title, step: "travelers", data: { totalPax } }); }}>
             {t("bk_continue")}
           </button>
         ) : (

@@ -8,8 +8,13 @@ import { useTravelData } from "../context/TravelDataContext";
 import { localizeData } from "../services/translate";
 import { useLocale } from "./i18n";
 import Header from "./Header";
-import { Footer } from "./Sections";
+import { Footer, NewsletterToggle } from "./Sections";
 import { FavoriteButton, Arrow } from "./ui";
+import ReservationExtras from "./ProfileExtras";
+import Inbox from "./Inbox";
+import { getInbox } from "../services/operations";
+import { packagePath } from "./seo";
+import { usePageMeta } from "./usePageMeta";
 import "./marketing.css";
 
 const jparse = (v, fb) => { try { return JSON.parse(v) ?? fb; } catch { return fb; } };
@@ -22,11 +27,12 @@ const STATUS = {
   cancelled: { key: "st_cancelled", cls: "is-bad" },
 };
 
-// Cancelling only makes sense before the trip has happened and while it
-// isn't already cancelled — "completed"/"cancelled" are terminal statuses.
-const CANCELLABLE_STATUSES = ["pending", "confirmed", "paid"];
+// Annulation en ligne tant que le dossier est en attente ou confirmé (règle
+// de l'API). Un dossier payé implique frais et remboursement : il passe par
+// l'agence.
+const CANCELLABLE_STATUSES = ["pending", "confirmed"];
 
-function ReservationCard({ r, t, nf, dateFmt, onCancel }) {
+function ReservationCard({ r, t, nf, dateFmt, onCancel, onUpdated }) {
   const [open, setOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const hotels = jparse(r.hotels, []);
@@ -107,6 +113,10 @@ function ReservationCard({ r, t, nf, dateFmt, onCancel }) {
               </div>
             </div>
           )}
+          <ReservationExtras r={r} onUpdated={onUpdated} />
+          {r.status === "paid" && (
+            <p className="mk-bk-muted">Pour annuler ou modifier un voyage déjà réglé, contactez votre conseiller (frais selon les conditions d'annulation).</p>
+          )}
           {canCancel && (
             <button
               type="button"
@@ -129,17 +139,18 @@ function FavoriteCard({ p, locale, nf, t, navigate }) {
   const title = p.title || d.destination || "—";
 
   return (
-    <article className="mk-sr-gcard" onClick={() => navigate(`/packages/view?pkgId=${p.$id}`)}>
+    <article className="mk-sr-gcard" onClick={() => navigate(packagePath(p.$id, title))}>
       <figure>
         {img ? <img src={img} alt={title} loading="lazy" /> : <span className="mk-sr-imgfall">{title.charAt(0)}</span>}
+        <span className="mk-trip-shade" aria-hidden="true" />
         <FavoriteButton id={p.$id} label={title} />
+        <h3>{title}</h3>
       </figure>
       <div className="mk-sr-gcard-meta">
-        <span>{p.country || d.country || "—"}</span>
+        <span>{[p.country || d.country, d.durationLabel].filter(Boolean).join(" · ") || "—"}</span>
       </div>
-      <h3>{title}</h3>
       <div className="mk-sr-gcard-foot">
-        <div className="mk-sr-price"><b>{nf.format(p.basePrice || 0)}</b> DH <span>{t("sr_per_person")}</span></div>
+        <div className="mk-sr-price"><b>{nf.format(p.basePrice || 0)}<i>DH</i></b><span>{t("sr_per_person")}</span></div>
         <span className="mk-sr-gcard-go"><Arrow size={14} /></span>
       </div>
     </article>
@@ -148,12 +159,18 @@ function FavoriteCard({ p, locale, nf, t, navigate }) {
 
 export default function ProfilePage() {
   const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
-  const { reservations, fetchMyReservations, cancelReservation, loading } = useReservation();
+  const { reservations, setReservations, fetchMyReservations, cancelReservation, loading } = useReservation();
   const { ids: favoriteIds } = useFavorites();
   const { packages } = useTravelData();
+  // Espace client : jamais indexé.
+  usePageMeta("Mon profil", undefined, { noindex: true });
   const { t, locale } = useLocale();
   const navigate = useNavigate();
-  const [tab, setTab] = useState(() => (window.location.hash === "#profil" ? "profile" : "res"));
+  const [tab, setTab] = useState(() =>
+    window.location.hash === "#profil" ? "profile" : window.location.hash === "#inbox" ? "inbox" : "res"
+  );
+  const [messages, setMessages] = useState([]);
+  const unread = messages.filter((m) => !m.readAt).length;
 
   const favoritePackages = useMemo(
     () => (packages || []).filter((p) => favoriteIds.includes(p.$id)),
@@ -169,6 +186,16 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) fetchMyReservations().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Boîte de réception : les emails envoyés par l'agence à ce compte.
+  useEffect(() => {
+    if (!user) return undefined;
+    let alive = true;
+    getInbox()
+      .then((r) => alive && setMessages(r?.messages || []))
+      .catch(() => {});
+    return () => { alive = false; };
   }, [user]);
 
   const firstName = (user?.name || user?.email || "").split(/[ @]/)[0];
@@ -219,10 +246,21 @@ export default function ProfilePage() {
               <button className="mk-btn" onClick={loginWithGoogle}>{t("bk_auth_google")}</button>
             </div>
           ) : (
-            <>
+            <div className="mk-pf-layout">
+              <aside className="mk-pf-side">
+              <div className="mk-pf-idrow mk-pf-side-id">
+                <span className="mk-pf-avatar">{firstName.charAt(0).toUpperCase()}</span>
+                <div>
+                  <b>{user?.name || "—"}</b>
+                  <span>{user?.email}</span>
+                </div>
+              </div>
               <div className="mk-pf-tabs" role="tablist">
                 <button role="tab" aria-selected={tab === "res"} className={tab === "res" ? "is-active" : ""} onClick={() => setTab("res")}>
                   {t("pf_tab_res")}{reservations.length ? ` (${reservations.length})` : ""}
+                </button>
+                <button role="tab" aria-selected={tab === "inbox"} className={tab === "inbox" ? "is-active" : ""} onClick={() => setTab("inbox")}>
+                  {t("pf_tab_inbox")}{unread ? <span className="mk-pf-badge">{unread}</span> : null}
                 </button>
                 <button role="tab" aria-selected={tab === "fav"} className={tab === "fav" ? "is-active" : ""} onClick={() => setTab("fav")}>
                   {t("pf_tab_fav")}{favoritePackages.length ? ` (${favoritePackages.length})` : ""}
@@ -231,7 +269,12 @@ export default function ProfilePage() {
                   {t("pf_tab_profile")}
                 </button>
               </div>
+              <a className="mk-alink mk-pf-side-help" href="/contact" onClick={(e) => { e.preventDefault(); navigate("/contact"); }}>
+                {t("pf_help")}
+              </a>
+              </aside>
 
+              <div className="mk-pf-main">
               {tab === "res" ? (
                 loading && !reservations.length ? (
                   <p className="mk-bk-muted">…</p>
@@ -244,10 +287,15 @@ export default function ProfilePage() {
                 ) : (
                   <div className="mk-pf-list">
                     {reservations.map((r) => (
-                      <ReservationCard key={r.$id} r={r} t={t} nf={nf} dateFmt={dateFmt} onCancel={cancelReservation} />
+                      <ReservationCard
+                        key={r.$id} r={r} t={t} nf={nf} dateFmt={dateFmt} onCancel={cancelReservation}
+                        onUpdated={(doc) => setReservations((rs) => rs.map((x) => (x.$id === doc.$id ? { ...x, ...doc } : x)))}
+                      />
                     ))}
                   </div>
                 )
+              ) : tab === "inbox" ? (
+                <Inbox messages={messages} setMessages={setMessages} t={t} dateFmt={dateFmt} onBrowse={() => navigate("/search")} />
               ) : tab === "fav" ? (
                 favoritePackages.length === 0 ? (
                   <div className="mk-sr-empty">
@@ -278,6 +326,10 @@ export default function ProfilePage() {
                       <div><dt>{t("pf_member_since")}</dt><dd>{dateFmt.format(new Date(user.$createdAt))}</dd></div>
                     )}
                   </dl>
+                  <div className="mk-pf-news">
+                    <h4>{t("footer_news")}</h4>
+                    <NewsletterToggle />
+                  </div>
                   <div className="mk-pf-actions">
                     <button className="mk-btn mk-btn--sm mk-btn--ghost" onClick={() => logout().then(() => { window.location.href = "/"; })}>
                       {t("pf_signout")}
@@ -288,7 +340,8 @@ export default function ProfilePage() {
                   </div>
                 </div>
               )}
-            </>
+              </div>
+            </div>
           )}
         </div>
       </main>

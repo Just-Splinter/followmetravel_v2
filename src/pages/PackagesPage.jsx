@@ -9,6 +9,8 @@ import { TravelDataProvider } from "../context/TravelDataContext";
 import { useClickOutside } from "../components/ClickOutSide";
 import { toast } from "react-toastify";
 import { withTranslations } from "../services/translate";
+import { bulkPrice } from "../services/operations";
+import { packagePath } from "../marketing/seo";
 import "../styles/Analyticsdashboard.css";
 import "../styles/PackagesPage.css";
 
@@ -113,9 +115,9 @@ const includedPictos = (data) => {
 };
 
 const CATEGORY_META = {
-  summer: { label: "Summer", color: "#0ea5e9", bg: "#eff6ff", text: "#0369a1" },
-  luxury: { label: "Luxury", color: "#d97706", bg: "#fef3c7", text: "#92400e" },
-  mythique: { label: "Mythique", color: "#7c3aed", bg: "#ede9fe", text: "#5b21b6" },
+  summer: { label: "Summer", color: "#2563eb", bg: "#eff6ff", text: "#1d4ed8" },
+  luxury: { label: "Luxury", color: "#d97706", bg: "#fffbeb", text: "#92400e" },
+  mythique: { label: "Mythique", color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9" },
 };
 
 const STATUS_META = {
@@ -138,6 +140,7 @@ const SORT_OPTIONS = [
 
 export default function PackagesManager() {
   const {
+    createPackage,
     updatePackage,
     deletePackage,
     findPackages,
@@ -280,6 +283,28 @@ export default function PackagesManager() {
   ]);
 
 
+  const duplicatePackage = async (pkg) => {
+    const raw = rawPackages.find((r) => r.$id === pkg.$id);
+    if (!raw) return;
+    const copy = Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith("$")));
+    try {
+      await createPackage({
+        ...copy,
+        title: `${raw.title || "Package"} (copie)`,
+        status: "draft",
+        publishAt: "",
+        unpublishAt: "",
+        data: JSON.stringify(raw.data || {}),
+      });
+      toast.success("Package dupliqué en brouillon.");
+      await loadPackages();
+    } catch (e) {
+      toast.error(e?.message || "Duplication impossible.");
+    }
+  };
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+
   const toggleSelect = id => setSelectedIds(s => {
     const n = new Set(s);
     n.has(id) ? n.delete(id) : n.add(id);
@@ -392,9 +417,10 @@ export default function PackagesManager() {
           data
         };
       })
-        // Les slides du hero vivent aussi dans `products` (data.kind === "hero-slide")
-        // mais se gèrent depuis Dashboard → Contenu du site, pas ici.
-        .filter(r => r.data?.kind !== "hero-slide");
+        // Les réglages du site vivent aussi dans `products` (data.kind : hero
+        // slides, omra, contact, notifications, agence) mais se gèrent depuis
+        // Paramètres, pas ici.
+        .filter(r => !r.data?.kind);
       setRawPackages(rows);
     } catch (err) {
       console.error("Erreur chargement packages:", err);
@@ -417,9 +443,15 @@ export default function PackagesManager() {
               {filtered.length} résultat{filtered.length !== 1 ? "s" : ""} · Dernière mise à jour aujourd'hui
             </p>
           </div>
-          <button className="em-action-btn primary" onClick={() => setOpenCreate(true)}>
-            <i className="ti ti-plus" aria-hidden="true" /> Nouveau package
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="em-action-btn" disabled={selectedIds.size === 0} onClick={() => setBulkOpen(true)}
+              title={selectedIds.size ? "" : "Cochez des packages pour modifier leurs prix"}>
+              <i className="ti ti-percentage" aria-hidden="true" /> Prix en masse{selectedIds.size ? ` (${selectedIds.size})` : ""}
+            </button>
+            <button className="em-action-btn primary" onClick={() => setOpenCreate(true)}>
+              <i className="ti ti-plus" aria-hidden="true" /> Nouveau package
+            </button>
+          </div>
         </div>
       </div>
 
@@ -518,14 +550,7 @@ export default function PackagesManager() {
                   setOpenDetail(true);
                 }}
                 onDelete={() => setConfirmDelete(pkg)}
-                onDuplicate={() => {
-                  setDetailPkg({
-                    ...pkg,
-                    $id: null,
-                    title: pkg.title + " (copie)",
-                  });
-                  setOpenEditInfo(true);
-                }}
+                onDuplicate={() => duplicatePackage(pkg)}
                 onEditInfo={() => {
                   setDetailPkg(pkg);
                   setOpenEditInfo(true);
@@ -564,14 +589,7 @@ export default function PackagesManager() {
                   setOpenDetail(true);
                 }}
                 onDelete={() => setConfirmDelete(pkg)}
-                onDuplicate={() => {
-                  setDetailPkg({
-                    ...pkg,
-                    $id: null,
-                    title: pkg.title + " (copie)",
-                  });
-                  setOpenEditInfo(true);
-                }}
+                onDuplicate={() => duplicatePackage(pkg)}
                 onEdit={() => {
                   setDetailPkg(pkg);
                   setOpenEdit(true);
@@ -666,6 +684,18 @@ export default function PackagesManager() {
       )}
       {openCreate && (
         <TravelDataProvider>
+          {bulkOpen && (
+            <BulkPriceModal
+              ids={[...selectedIds]}
+              titles={rawPackages.filter((r) => selectedIds.has(r.$id)).map((r) => r.title)}
+              onClose={() => setBulkOpen(false)}
+              onDone={async () => {
+                setBulkOpen(false);
+                setSelectedIds(new Set());
+                await loadPackages();
+              }}
+            />
+          )}
           <CreatePackageModal
             pkg={undefined}
             onClose={() => setOpenCreate(false)}
@@ -689,6 +719,58 @@ export default function PackagesManager() {
 }
 
 // ── Package Card ──────────────────────────────────────────────────────
+/**
+ * Hausse (ou baisse) de prix sur les packages cochés : prix « à partir de »,
+ * tarifs des chambres, suppléments de départ — arrondis. Les réservations
+ * existantes ne changent pas.
+ */
+function BulkPriceModal({ ids, titles, onClose, onDone }) {
+  const [percent, setPercent] = useState("5");
+  const [amount, setAmount] = useState("");
+  const [roundTo, setRoundTo] = useState("10");
+  const [apply, setApply] = useState({ base: true, rooms: true, departures: false });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const run = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await bulkPrice({ ids, percent: Number(percent) || 0, amount: Number(amount) || 0, roundTo: Number(roundTo) || 1, apply });
+      toast.success(`${r.updated} package(s) mis à jour.`);
+      await onDone();
+    } catch (e) {
+      setError(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const box = { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, color: "#475569" };
+  const inp = { padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontFamily: "inherit" };
+  return (
+    <Modal onClose={onClose} title={`Modifier les prix — ${ids.length} package(s)`}>
+      <p style={{ fontSize: 13, color: "#64748b", marginTop: 0 }}>{titles.join(" · ")}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <label style={box}>Variation (%)<input style={inp} type="number" step="0.5" value={percent} onChange={(e) => setPercent(e.target.value)} /></label>
+        <label style={box}>et / ou montant (DH)<input style={inp} type="number" step="50" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" /></label>
+        <label style={box}>Arrondi à<input style={inp} type="number" min="1" value={roundTo} onChange={(e) => setRoundTo(e.target.value)} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 16, margin: "14px 0", fontSize: 13 }}>
+        {[["base", "Prix « à partir de »"], ["rooms", "Tarifs des chambres"], ["departures", "Suppléments de départ"]].map(([k, l]) => (
+          <label key={k} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input type="checkbox" checked={apply[k]} onChange={(e) => setApply((a) => ({ ...a, [k]: e.target.checked }))} /> {l}
+          </label>
+        ))}
+      </div>
+      <p style={{ fontSize: 12, color: "#94a3b8" }}>Exemple : +5 % et arrondi à 10 → 13 900 DH devient 14 600 DH. Les réservations déjà enregistrées gardent leur prix.</p>
+      {error && <p style={{ color: "#dc2626", fontSize: 13 }}>⚠ {error}</p>}
+      <div className="adm-modal-footer">
+        <button className="em-action-btn" onClick={onClose}>Annuler</button>
+        <button className="em-action-btn primary" disabled={saving} onClick={run}>{saving ? "…" : "Appliquer"}</button>
+      </div>
+    </Modal>
+  );
+}
+
 function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit, onDuplicate, loadingStatus, onEditInfo, onTranslate, translating }) {
   const cat = CATEGORY_META[pkg._category] || CATEGORY_META.summer;
   const st = STATUS_META[pkg.status] || STATUS_META.draft;
@@ -727,12 +809,12 @@ function PackageCard({ pkg, selected, onDetail, onDelete, onToggleStatus, onEdit
             {[
               {
                 icon: "ti-eye", label: "Ouvrir", fn: () => {
-                  window.open(`${window.location.origin}/packages/view?pkgId=${pkg.$id}`, "_blank");
+                  window.open(`${window.location.origin}${packagePath(pkg.$id, pkg.title)}`, "_blank");
                 }
               },
               {
                 icon: "ti-copy", label: "Copier lien", fn: () => {
-                  navigator.clipboard.writeText(`${window.location.origin}/packages/view?pkgId=${pkg.$id}&mode=admin`);
+                  navigator.clipboard.writeText(`${window.location.origin}${packagePath(pkg.$id, pkg.title)}?mode=admin`);
                 }
               },
               { icon: "ti-edit", label: "Modifier Infos", fn: onEditInfo },
@@ -940,7 +1022,7 @@ function DetailPanel({ pkg, onClose, onDelete, onEdit, onTranslate, translating 
         </div>
 
         <div className="pkg-detail-footer">
-          <button onClick={onDelete} className="em-action-btn danger" style={{ border: "1px solid #fca5a5", background: "#fef2f2" }}>
+          <button onClick={onDelete} className="em-action-btn danger" style={{ border: "1px solid #fecaca", background: "#fef2f2" }}>
             <i className="ti ti-trash" aria-hidden="true" /> Supprimer
           </button>
           <button onClick={onTranslate} disabled={translating} className="em-action-btn" title="Mettre à jour les traductions (EN/AR)" style={{ border: "1px solid #e2e8f0" }}>
@@ -996,7 +1078,7 @@ function OverviewTab({ pkg }) {
               minute: "2-digit",
             }),
           },
-          { icon: "ti-world-www", label: "Lien", value: "http://localhost:5173/packages/view?pkgId=" + pkg.$id + "&mode=admin" }
+          { icon: "ti-world-www", label: "Lien", value: `${window.location.origin}${packagePath(pkg.$id, pkg.title)}?mode=admin` }
         ].map((r, i) => (
           <div key={i} className="pkg-info-row">
             <span className="pkg-info-row-label">

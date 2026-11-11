@@ -11,8 +11,8 @@
   --sb-cream-dim: rgba(246, 242, 234, 0.6);
   --sb-cream-faint: rgba(246, 242, 234, 0.4);
   --sb-line: rgba(246, 242, 234, 0.1);
-  --sb-accent: #e8630a;
-  --sb-accent-soft: rgba(232, 99, 10, 0.16);
+  --sb-accent: var(--adm-brand);
+  --sb-accent-soft: rgba(255, 117, 14, 0.16);
   --sb-serif: "Fraunces", "Times New Roman", serif;
   --sb-sans: "Instrument Sans", "Helvetica Neue", sans-serif;
 

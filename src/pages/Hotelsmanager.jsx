@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import {
   Hotel, MapPin, Star, Plus, Edit, Trash2, Search, Save, X, Image as ImageIcon, BedDouble,
@@ -6,15 +6,19 @@ import {
 import { useHotels, parseHotelRoomTypes } from "../context/HotelsContext";
 import StorageService from "../services/storage";
 import { ROOM_TYPES } from "../services/roomTypes";
+import { loadHotelUsage, propagateHotel } from "../services/hotelUsage";
+import { ADM } from "../styles/adminTokens";
+import { useDetailModal } from "../services/detailModal";
 
 // Design Tokens
+// Couleurs du design system admin (styles/adminTokens.js).
 const T = {
-  primary: "#7F77DD",
-  primaryDim: "#EEEDFE",
-  secondary: "#1D9E75",
-  accent: "#D85A30",
-  gray: "#64748b",
-  lightGray: "#f1f5f9",
+  primary: ADM.brand,
+  primaryDim: ADM.brandSoft,
+  secondary: ADM.success,
+  accent: ADM.brand,
+  gray: ADM.muted,
+  lightGray: ADM.surface2,
 };
 
 // ─── Star Rating ────────────────────────────────────────────────────────────
@@ -84,7 +88,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="adm-modal-header" style={{ padding: "20px 24px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{title}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 6, color: T.gray }}>
             <X size={20} />
@@ -105,6 +109,12 @@ export default function HotelManager() {
   const [modalMode, setModalMode] = useState(null); // null | "create" | "edit"
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Packages qui utilisent chaque hôtel (lignes de formule reliées au catalogue).
+  const [usage, setUsage] = useState({ products: [], usage: {} });
+  const refreshUsage = useCallback(() => loadHotelUsage().then(setUsage).catch(() => {}), []);
+  useEffect(() => {
+    refreshUsage();
+  }, [refreshUsage]);
 
   const cities = useMemo(
     () => [...new Set(hotels.map((h) => h.city).filter(Boolean))].sort(),
@@ -156,6 +166,19 @@ export default function HotelManager() {
       } else {
         await updateHotel(editing.$id, payload);
         toast.success("Hôtel mis à jour.");
+        // Nom / ville / étoiles modifiés : proposer de les reporter dans les
+        // packages qui affichent cet hôtel (leurs tarifs ne bougent pas).
+        const used = usage.usage[editing.$id] || [];
+        const before = hotels.find((h) => h.$id === editing.$id) || {};
+        const identityChanged = before.name !== payload.name || before.city !== payload.city || Number(before.stars) !== payload.stars;
+        if (used.length && identityChanged && window.confirm(
+          `Cet hôtel est utilisé dans ${used.length} package(s) : ${used.map((u) => u.title).join(", ")}.\n` +
+          "Reporter le nouveau nom, la ville et les étoiles dans ces packages ? (les tarifs ne changent pas)"
+        )) {
+          const n = await propagateHotel(usage.products, { $id: editing.$id, ...payload });
+          toast.success(`${n} package(s) mis à jour.`);
+          refreshUsage();
+        }
       }
       close();
     } catch (err) {
@@ -166,7 +189,11 @@ export default function HotelManager() {
   };
 
   const remove = async (h) => {
-    if (!window.confirm(`Supprimer "${h.name}" ? Les packages qui le référencent déjà ne sont pas modifiés.`)) return;
+    const used = usage.usage[h.$id] || [];
+    const warning = used.length
+      ? `\n\n⚠ Utilisé dans ${used.length} package(s) : ${used.map((u) => u.title).join(", ")}.\nCes packages garderont le nom de l'hôtel en texte libre, mais perdront le suivi des chambres.`
+      : "";
+    if (!window.confirm(`Supprimer "${h.name}" ?${warning}`)) return;
     try {
       await deleteHotel(h.$id);
       toast.success("Hôtel supprimé.");
@@ -245,7 +272,7 @@ export default function HotelManager() {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
           {filtered.map((h) => (
-            <HotelCard key={h.$id} hotel={h} onEdit={() => openEdit(h)} onDelete={() => remove(h)} />
+            <HotelCard key={h.$id} hotel={h} usedIn={usage.usage[h.$id] || []} onEdit={() => openEdit(h)} onDelete={() => remove(h)} />
           ))}
         </div>
       )}
@@ -275,7 +302,8 @@ function StatCard({ icon: Icon, label, value, color }) {
 }
 
 // ─── Hotel Card ─────────────────────────────────────────────────────────────
-function HotelCard({ hotel, onEdit, onDelete }) {
+function HotelCard({ hotel, usedIn, onEdit, onDelete }) {
+  const { openPackage, openHotel } = useDetailModal();
   const roomTypes = parseHotelRoomTypes(hotel.rooms);
   return (
     <div style={{ backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
@@ -283,7 +311,9 @@ function HotelCard({ hotel, onEdit, onDelete }) {
         {!hotel.image && <Hotel size={28} style={{ color: "#cbd5e1" }} />}
       </div>
       <div style={{ padding: 18 }}>
-        <h3 style={{ margin: "0 0 6px 0", fontSize: 16, fontWeight: 600 }}>{hotel.name}</h3>
+        <h3 style={{ margin: "0 0 6px 0", fontSize: 16, fontWeight: 600 }}>
+          <button className="adm-link" style={{ color: "var(--adm-ink)", fontWeight: 700 }} onClick={() => openHotel(hotel.$id)}>{hotel.name}</button>
+        </h3>
         <div style={{ display: "flex", alignItems: "center", gap: 6, color: T.gray, marginBottom: 10, fontSize: 13 }}>
           <MapPin size={13} />
           {hotel.city}
@@ -293,15 +323,23 @@ function HotelCard({ hotel, onEdit, onDelete }) {
           {hotel.address && <Badge color="gray">{hotel.address}</Badge>}
         </div>
         {roomTypes.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 10 }}>
             <Badge color="primary"><BedDouble size={11} /> {roomTypes.length} type{roomTypes.length > 1 ? "s" : ""} de chambre</Badge>
           </div>
         )}
+        <div style={{ marginBottom: 14, fontSize: 12, color: T.gray }} title={usedIn.map((u) => `${u.title}${u.formules.length ? ` (${u.formules.join(", ")})` : ""}`).join("\n")}>
+          {usedIn.length
+            ? <>Utilisé dans <strong>{usedIn.length} package{usedIn.length > 1 ? "s" : ""}</strong> :{" "}
+                {usedIn.map((u, i) => (
+                  <span key={u.packageId}>{i > 0 && ", "}<button className="adm-link" onClick={() => openPackage(u.packageId)}>{u.title}</button></span>
+                ))}</>
+            : "Pas encore utilisé dans un package"}
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={onEdit} style={{ flex: 1, padding: 8, backgroundColor: T.primaryDim, color: T.primary, border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Edit size={14} /> Modifier
           </button>
-          <button onClick={onDelete} style={{ padding: 8, backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, cursor: "pointer" }}>
+          <button onClick={onDelete} style={{ padding: 8, backgroundColor: "#fef2f2", color: "#DC2626", border: "none", borderRadius: 6, cursor: "pointer" }}>
             <Trash2 size={16} />
           </button>
         </div>
@@ -406,7 +444,7 @@ function HotelForm({ hotel, onChange, onSave, onCancel, saving }) {
                 <button
                   type="button"
                   onClick={() => removeType(i)}
-                  style={{ padding: 8, backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, cursor: "pointer", flexShrink: 0 }}
+                  style={{ padding: 8, backgroundColor: "#fef2f2", color: "#DC2626", border: "none", borderRadius: 6, cursor: "pointer", flexShrink: 0 }}
                 >
                   <X size={14} />
                 </button>
@@ -448,7 +486,7 @@ function HotelForm({ hotel, onChange, onSave, onCancel, saving }) {
         </p>
       </FormField>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 8 }}>
+      <div className="adm-modal-footer">
         <button onClick={onCancel} style={cancelButtonStyle}>Annuler</button>
         <button onClick={onSave} disabled={saving} style={{ ...saveButtonStyle, opacity: saving ? 0.6 : 1 }}>
           <Save size={16} />

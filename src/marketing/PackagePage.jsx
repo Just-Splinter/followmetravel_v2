@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 import { RECAPTCHA_SITE_KEY } from "../services/recaptcha";
 import { usePackages } from "../context/PackageViewerContext";
@@ -10,11 +10,17 @@ import Header from "./Header";
 import { Footer } from "./Sections";
 import { Reveal, Arrow, FavoriteButton } from "./ui";
 import BookingFlow from "./BookingFlow";
+import WhatsAppButton from "./WhatsAppButton";
+import { useAgency } from "../services/useAgency";
+import { getAvailability } from "../services/operations";
+import { cancellationLines, whatsappLink } from "../services/agency";
 import { upcomingDepartures } from "./dates";
 import GeoMap from "./GeoMap";
 import { resolvePlace } from "./geo";
-import { localizeData } from "../services/translate";
+import { packageFromDoc, bookingPath } from "./packageDoc";
 import { usePageMeta } from "./usePageMeta";
+import { formuleMode } from "../services/formules";
+import { breadcrumbJsonLd, packageJsonLd, packagePath, packageSeo } from "./seo";
 import { roomTypesFor } from "../services/roomTypes";
 import "./marketing.css";
 
@@ -128,13 +134,20 @@ export default function PackagePage({ previewDoc = null }) {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const pkgId = searchParams.get("pkgId");
+  const params = useParams();
+  const location = useLocation();
+  // /voyages/<id>/<slug> (canonique) ou l'ancienne /packages/view?pkgId=<id>
+  const pkgId = params.id || searchParams.get("pkgId");
   const [booking, setBooking] = useState(false);
   const [bookDateIdx, setBookDateIdx] = useState(null);
   const [lb, setLb] = useState(null);
   const [descModal, setDescModal] = useState(null); // {title, text} | null
   const [catTab, setCatTab] = useState(0);
   const [activeCh, setActiveCh] = useState(null);
+  // Carte de réservation : départ, formule et voyageurs choisis avant d'ouvrir la page de réservation.
+  const [selDate, setSelDate] = useState(null);
+  const [selCat, setSelCat] = useState(0);
+  const [selPax, setSelPax] = useState(2);
   const nf = new Intl.NumberFormat(locale === "ar" ? "ar-MA" : "fr-MA");
 
   useEffect(() => {
@@ -145,17 +158,19 @@ export default function PackagePage({ previewDoc = null }) {
   }, [pkgId]);
 
   const doc = previewDoc || selectedPkg;
-  const pkg = useMemo(() => {
-    if (!doc) return null;
-    const raw = typeof doc.data === "object" && doc.data !== null ? doc.data : (() => { try { return JSON.parse(doc.data) || {}; } catch { return {}; } })();
-    const d = localizeData(raw, locale);
-    return { ...d, $id: doc.$id, title: doc.title, basePrice: doc.basePrice, country: d.country || doc.country };
-  }, [doc, locale]);
+  const pkg = useMemo(() => packageFromDoc(doc, locale), [doc, locale]);
 
-  usePageMeta(
-    pkg?.title || pkg?.destination,
-    pkg?.tagline || pkg?.subtitleItalic || (pkg ? `${pkg.destination || pkg.title}${pkg.country ? ", " + pkg.country : ""}${pkg.durationLabel ? " — " + pkg.durationLabel : ""}` : undefined)
-  );
+  // Une seule URL par voyage : l'ancienne adresse et un slug périmé sont
+  // remplacés par /voyages/<id>/<slug> (contexte de réservation conservé).
+  // Les liens d'aperçu de l'équipe (?mode=admin) restent tels quels.
+  const canonicalPath = doc && !preview ? packagePath(doc.$id, doc.title) : null;
+  useEffect(() => {
+    if (!canonicalPath || searchParams.get("mode") || location.pathname === canonicalPath) return;
+    const qs = new URLSearchParams(searchParams);
+    qs.delete("pkgId");
+    const q = qs.toString();
+    navigate(`${canonicalPath}${q ? `?${q}` : ""}${location.hash}`, { replace: true });
+  }, [canonicalPath, location.pathname, location.hash, searchParams, navigate]);
 
   // Fires once per package (not per locale switch) — keyed on $id only.
   useEffect(() => {
@@ -232,6 +247,36 @@ export default function PackagePage({ previewDoc = null }) {
   }, [pkg]);
 
   const dates = useMemo(() => upcomingDepartures(pkg?.departureDates), [pkg]);
+  const agency = useAgency();
+
+  // Places restantes / supplément / garanti par départ (agrégats publics, sans donnée client).
+  const [availability, setAvailability] = useState([]);
+  const availId = preview ? null : doc?.$id;
+  useEffect(() => {
+    if (!availId) return;
+    let alive = true;
+    getAvailability(availId).then((a) => alive && setAvailability(a.departures)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [availId]);
+  const availOf = (d) => availability.find((a) => a.from === d.from && (!d.to || a.to === d.to)) || null;
+
+  const seo = useMemo(() => (doc && !preview ? packageSeo(doc) : null), [doc, preview]);
+  const jsonLd = useMemo(() => {
+    if (!seo) return null;
+    const deps = availability.filter((a) => a.start).map((a) => ({ start: a.start, closed: a.closed, price: seo.price + (Number(a.supplement) || 0) }));
+    return [packageJsonLd(seo, deps), breadcrumbJsonLd([["Accueil", "/"], ["Voyages", "/search"], [seo.title, seo.path]])];
+  }, [seo, availability]);
+  // Voyage retiré ou inexistant (l'API ne renvoie que les voyages publiés) : jamais indexé.
+  const notFound = !pkg && !loading;
+  usePageMeta(notFound ? t("pk_notfound") : pkg?.title || pkg?.destination, seo?.description, {
+    path: seo?.path,
+    image: seo?.image,
+    jsonLd,
+    noindex: notFound || preview || !!searchParams.get("mode"),
+  });
+  const cancellation = useMemo(() => cancellationLines(pkg?.cancellationPolicy ?? agency.cancellationPolicy), [pkg, agency]);
   const cats = pkg?.hotelCategories || [];
   const place = useMemo(
     () => (pkg ? resolvePlace(pkg.destination, pkg.destinationAccent, pkg.title, pkg.country) : null),
@@ -245,11 +290,12 @@ export default function PackagePage({ previewDoc = null }) {
     if ((pkg.days || []).length) list.push({ id: "ch-days", label: pkg.itineraryTitle || t("pk_days") });
     if (cats.length) list.push({ id: "ch-hotels", label: t("pk_formules") });
     if (dates.length) list.push({ id: "ch-dates", label: t("pk_dates") });
+    list.push({ id: "ch-terms", label: "Conditions & garanties" });
     if (place) list.push({ id: "ch-map", label: t("pk_map") });
-    if (images.length > 1) list.push({ id: "ch-gallery", label: t("pk_gallery") });
+    // La galerie est en haut de fiche (mosaïque + visionneuse) : pas de chapitre.
     return list;
-     
-  }, [pkg, cats.length, dates.length, images.length, place, t]);
+
+  }, [pkg, cats.length, dates.length, place, t]);
 
   /* scrollspy for the chapter rail */
   useEffect(() => {
@@ -264,10 +310,21 @@ export default function PackagePage({ previewDoc = null }) {
     return () => io.disconnect();
   }, [pkg, chapters.length]);
 
-  const openBooking = (dateIdx = null) => {
+  const openBooking = (dateIdx = null, opts = {}) => {
     trackReserve({ targetId: pkg.$id, label: pkg.title || pkg.destination, page: window.location.pathname });
-    setBookDateIdx(dateIdx);
-    setBooking(true);
+    // Aperçu de l'éditeur : pas d'URL publique, la page de réservation s'affiche sur place.
+    if (preview) {
+      setBookDateIdx(dateIdx);
+      setBooking(true);
+      window.scrollTo(0, 0);
+      return;
+    }
+    navigate(bookingPath(pkg.$id, {
+      dateIdx,
+      adults: opts.adults ?? searchParams.get("adults"),
+      date: searchParams.get("date"),
+      formule: opts.formule,
+    }));
   };
   const goCh = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
@@ -293,6 +350,22 @@ export default function PackagePage({ previewDoc = null }) {
     );
   }
 
+  if (preview && booking) {
+    return (
+      <GoogleReCaptchaProvider reCaptchaKey={RECAPTCHA_SITE_KEY}>
+        <ReservationProvider>
+          <BookingFlow
+            asPage
+            pkg={pkg}
+            preview
+            initialDateIdx={bookDateIdx}
+            onClose={() => { setBooking(false); setBookDateIdx(null); }}
+          />
+        </ReservationProvider>
+      </GoogleReCaptchaProvider>
+    );
+  }
+
   const priceFrom = pkg.basePrice || parsePrice(cats[0]?.basePrice);
   // Same derivation the booking wizard uses, so the price sheet and the
   // steppers can never show a different set of room columns.
@@ -304,6 +377,14 @@ export default function PackagePage({ previewDoc = null }) {
      `subtitleItalic`, which is exactly the text the hero used to print. */
   const descFull = String(pkg.description || pkg.tagline || pkg.subtitleItalic || "").trim();
   const desc = descFull ? clampWords(descFull) : null;
+
+  const kicker = [pkg.country, pkg.periodLabel ? `${t("pk_edition")} ${pkg.periodLabel}` : ""].filter(Boolean).join(" · ");
+  // Accroche courte sous le titre, seulement si la description longue existe à part (sinon doublon).
+  const lede = pkg.description ? String(pkg.tagline || pkg.subtitleItalic || "").trim() : "";
+  const firstOpen = Math.max(0, dates.findIndex((d) => !availOf(d)?.closed));
+  const dateValue = selDate ?? (dates.length ? firstOpen : null);
+  const phones = agency.phones?.length ? agency.phones : [];
+  const wa = whatsappLink(agency, `Bonjour, une question sur le voyage « ${pkg.title || pkg.destination} ».`);
 
   const specs = [
     pkg.durationLabel && { k: t("sr_duration"), v: pkg.durationLabel },
@@ -317,101 +398,68 @@ export default function PackagePage({ previewDoc = null }) {
     <div className={`mk ${flat ? "mk--flat" : ""}`}>
       {!preview && <Header />}
       <main>
-        {/* ── Composed hero: title tucked behind the mounted plate ── */}
-        <section className="mk-pk-hero2 mk-grain">
-          <div className="mk-wrap mk-pk-hero2-top">
-            <nav className="mk-pk-crumb" aria-label="breadcrumb" style={{ margin: 0 }}>
-              <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>{t("pk_home")}</a>
-              <i>/</i>
-              <a href="/search" onClick={(e) => { e.preventDefault(); navigate("/search"); }}>{t("nav_trips")}</a>
-            </nav>
-            {(pkg.periodLabel || pkg.country) && (
-              <span className="mk-pk-hero2-ed">
-                <em>{t("pk_edition")}</em> {pkg.periodLabel || pkg.country}
-              </span>
-            )}
-          </div>
+        {/* ── Haut de fiche : fil d'Ariane + galerie mosaïque ── */}
+        <section className="mk-pk-top">
+          <div className="mk-wrap">
+            <div className="mk-pk-top-bar">
+              <nav className="mk-pk-crumb" aria-label="breadcrumb" style={{ margin: 0 }}>
+                <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>{t("pk_home")}</a>
+                <i>/</i>
+                <a href="/search" onClick={(e) => { e.preventDefault(); navigate("/search"); }}>{t("nav_trips")}</a>
+                <i>/</i>
+                <span aria-current="page">{pkg.title}</span>
+              </nav>
+            </div>
 
-          <h1 className="mk-pk-hero2-ttl">
-            <span className="mk-line"><span className="mk-rise">{pkg.destination || pkg.title}</span></span>
-            {pkg.destinationAccent && (
-              <span className="mk-line mk-pk-hero2-l2">
-                <span className="mk-rise mk-rise--d2"><em>{pkg.destinationAccent}</em></span>
-              </span>
-            )}
-          </h1>
-
-          <div className="mk-wrap mk-pk-hero2-stage">
-            <div className="mk-pk-hero2-left">
-              {/* the long description now closes the reading column — see
-                  `.mk-pk-desc` at the end of `.mk-pk-read` */}
-              <dl className="mk-pk-specs2">
-                {specs.map((r) => (
-                  <div key={r.k}><dt>{r.k}</dt><dd>{r.v}</dd></div>
+            {images.length > 0 && (
+              <div className={`mk-pk-mosaic mk-pk-mosaic--${Math.min(images.length, 5)}`}>
+                {images.slice(0, 5).map((src, i) => (
+                  <button key={src} onClick={() => setLb(i)} aria-label={`${t("pk_gallery")} ${i + 1}`}>
+                    <img src={src} alt="" fetchPriority={i === 0 ? "high" : undefined} loading={i > 0 ? "lazy" : undefined} />
+                  </button>
                 ))}
-              </dl>
-              <div className="mk-pk-hero2-cta">
-                <div className="mk-pk-hero-price">
-                  <span>{t("trips_from")}</span>
-                  <b>{nf.format(priceFrom || 0)}<i>DH</i></b>
-                  <span>{t("sr_per_person")} · {t("sr_night_note")}</span>
-                </div>
-                <button className="mk-btn" onClick={() => openBooking()}>{t("pk_book")}</button>
-                {!preview && <FavoriteButton id={pkg.$id} label={pkg.title || pkg.destination} className="mk-pk-fav" />}
+                {images.length > 1 && (
+                  <button className="mk-pk-mosaic-all" onClick={() => setLb(0)}>
+                    {t("pk_gallery")} · {String(images.length).padStart(2, "0")} {t("pk_photos")}
+                  </button>
+                )}
               </div>
-            </div>
-
-            <figure className="mk-pk-hero2-plate">
-              {images[0] && <img src={images[0]} alt="" fetchPriority="high" />}
-              {images.length > 1 && (
-                <button className="mk-pk-hero2-galbtn" onClick={() => setLb(0)}>
-                  {t("pk_gallery")} · {String(images.length).padStart(2, "0")}
-                </button>
-              )}
-            </figure>
-          </div>
-
-          <div className="mk-wrap mk-pk-hero2-foot">
-            <span className="mk-pk-scrollcue" aria-hidden="true">
-              <i />
-              {t("pk_scroll")}
-            </span>
-            <div className="mk-pk-hero-phones">
-              <span>{t("pk_question")}</span>
-              <a href="tel:+212664586425">+212 664 586 425</a>
-              <a href="tel:+212520655575">+212 520 655 575</a>
-            </div>
+            )}
           </div>
         </section>
 
-        {/* ── Body: chapter rail + reading column ── */}
+        {/* ── Corps : colonne de lecture + carte de réservation (sticky) ── */}
         <div className="mk-wrap">
           <div className="mk-pk-body">
-            <aside className="mk-pk-toc">
-              <em>{t("pk_toc")}</em>
-              <nav>
-                {chapters.map((c, i) => (
-                  <a
-                    key={c.id}
-                    href={`#${c.id}`}
-                    className={activeCh === c.id ? "is-active" : ""}
-                    onClick={(e) => { e.preventDefault(); goCh(c.id); }}
-                  >
-                    <i>{String(i + 1).padStart(2, "0")}</i>
-                    <span>{c.label}</span>
-                  </a>
-                ))}
-              </nav>
-              <div className="mk-pk-toc-card">
-                <span>{t("trips_from")}</span>
-                <b>{nf.format(priceFrom || 0)} DH</b>
-                <button className="mk-btn mk-btn--paper mk-btn--sm" onClick={() => openBooking()}>
-                  {t("card_book")}
-                </button>
-              </div>
-            </aside>
-
             <div className="mk-pk-read">
+              <header className="mk-pk-head">
+                {kicker && <span className="mk-eyebrow">{kicker}</span>}
+                <h1 className="mk-h2 mk-pk-title">{pkg.title || `${pkg.destination ?? ""}${pkg.destinationAccent ?? ""}`}</h1>
+                {lede && <p className="mk-lead mk-pk-lede">{lede}</p>}
+                {/* la description longue ferme la colonne de lecture — voir `.mk-pk-desc` */}
+                <dl className="mk-pk-specs2">
+                  {specs.map((r) => (
+                    <div key={r.k}><dt>{r.k}</dt><dd>{r.v}</dd></div>
+                  ))}
+                </dl>
+              </header>
+
+              {chapters.length > 1 && (
+                <nav className="mk-pk-tabs" aria-label={t("pk_toc")}>
+                  {chapters.map((c) => (
+                    <a
+                      key={c.id}
+                      href={`#${c.id}`}
+                      className={activeCh === c.id ? "is-active" : ""}
+                      aria-current={activeCh === c.id ? "true" : undefined}
+                      onClick={(e) => { e.preventDefault(); goCh(c.id); }}
+                    >
+                      {c.label}
+                    </a>
+                  ))}
+                </nav>
+              )}
+
               {/* CMS sections */}
               {(pkg.sections || []).map((s, i) => (
                 <Reveal as="section" key={s.id ?? i} id={`ch-s${i}`} data-chapter="" className="mk-pk-chap">
@@ -513,7 +561,10 @@ export default function PackagePage({ previewDoc = null }) {
                   )}
                   {cats[catTab] && (
                     <div className="mk-pk-sheet">
-                      <em className="mk-pk-sheet-cap">{t("pk_table_note")}</em>
+                      <em className="mk-pk-sheet-cap">
+                        {t("pk_table_note")}
+                        {(cats[catTab].hotels || []).length > 1 && ` · ${t(formuleMode(cats[catTab]) === "circuit" ? "pk_circuit_note" : "pk_sejour_note")}`}
+                      </em>
                       <div className="mk-pk-tablewrap">
                         <table className="mk-pk-table">
                           <thead>
@@ -557,16 +608,44 @@ export default function PackagePage({ previewDoc = null }) {
                 <section className="mk-pk-chap" id="ch-dates" data-chapter="">
                   <ChapHead n={++chapN} title={t("pk_dates")} />
                   <div className="mk-pk-tickets">
-                    {dates.map((d, i) => (
-                      <Reveal as="button" key={d.id ?? i} delay={(i % 4) * 50} className="mk-pk-ticket" onClick={() => openBooking(i)}>
-                        <em>{t("pk_departure")}</em>
-                        <b>{d.from} → {d.to}</b>
-                        <span><Arrow size={13} /></span>
-                      </Reveal>
-                    ))}
+                    {dates.map((d, i) => {
+                      const a = availOf(d);
+                      const full = !!a?.closed;
+                      return (
+                        <Reveal as="button" key={d.id ?? i} delay={(i % 4) * 50} className={`mk-pk-ticket${full ? " is-full" : ""}`} disabled={full} onClick={() => !full && openBooking(i)}>
+                          <em>{t("pk_departure")}</em>
+                          <b>{d.from} → {d.to}</b>
+                          {a && (
+                            <small className="mk-pk-ticket-meta">
+                              {full ? <i className="is-full">Complet</i> : a.remaining !== null && a.remaining <= 6 ? <i className="is-low">Plus que {a.remaining} place{a.remaining > 1 ? "s" : ""}</i> : null}
+                              {a.guaranteed && !full && <i className="is-ok">Départ garanti</i>}
+                              {a.supplement !== 0 && <i>{a.supplement > 0 ? "+" : "−"}{nf.format(Math.abs(a.supplement))} DH / pers.</i>}
+                            </small>
+                          )}
+                          <span><Arrow size={13} /></span>
+                        </Reveal>
+                      );
+                    })}
                   </div>
                 </section>
               )}
+
+              {/* Conditions & garanties : confiance avant de réserver */}
+              <section className="mk-pk-chap" id="ch-terms" data-chapter="">
+                <ChapHead n={++chapN} title="Conditions & garanties" />
+                <ul className="mk-pk-trust">
+                  {(agency.trustBadges || []).map((b) => <li key={b}>✓ {b}</li>)}
+                  {agency.licenceNumber && <li>✓ Licence d'agence de voyages n° {agency.licenceNumber}</li>}
+                </ul>
+                <h4 className="mk-pk-terms-h">Conditions d'annulation</h4>
+                <ul className="mk-pk-terms">
+                  {cancellation.map((l) => <li key={l}>{l}</li>)}
+                </ul>
+                <p className="mk-pk-terms-note">
+                  Paiement : acompte de {agency.depositPercent} % à la confirmation, solde {agency.balanceDaysBeforeDeparture} jours avant le départ.{" "}
+                  <a href="/legal/cgv" target="_blank" rel="noreferrer">Conditions générales de vente</a>
+                </p>
+              </section>
 
               {/* Location map */}
               {place && (
@@ -599,27 +678,65 @@ export default function PackagePage({ previewDoc = null }) {
                 </section>
               )}
             </div>
+
+            <aside className="mk-pk-toc">
+              <div className="mk-pk-book">
+                <div className="mk-pk-book-top">
+                  <div className="mk-pk-hero-price">
+                    <span>{t("trips_from")}</span>
+                    <b>{nf.format(priceFrom || 0)}<i>DH</i></b>
+                    <span>{t("sr_per_person")} · {t("sr_night_note")}</span>
+                  </div>
+                  {!preview && <FavoriteButton id={pkg.$id} label={pkg.title || pkg.destination} className="mk-pk-fav" />}
+                </div>
+                {dates.length > 0 && (
+                  <label className="mk-pk-field">
+                    <span>{t("bk_date")}</span>
+                    <select value={dateValue ?? ""} onChange={(e) => setSelDate(Number(e.target.value))}>
+                      {dates.map((d, i) => {
+                        const a = availOf(d);
+                        const note = a?.closed ? t("dep_full") : a?.guaranteed ? t("dep_guaranteed") : "";
+                        return (
+                          <option key={d.id ?? i} value={i} disabled={!!a?.closed}>
+                            {d.from} → {d.to}{note ? ` · ${note}` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                )}
+                {cats.length > 1 && (
+                  <label className="mk-pk-field">
+                    <span>{t("bk_formule")}</span>
+                    <select value={selCat} onChange={(e) => setSelCat(Number(e.target.value))}>
+                      {cats.map((c, i) => <option key={c.id ?? i} value={i}>{c.label}</option>)}
+                    </select>
+                  </label>
+                )}
+                <label className="mk-pk-field">
+                  <span>{t("bk_pax_label")}</span>
+                  <select value={selPax} onChange={(e) => setSelPax(Number(e.target.value))}>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n} {t("bk_travelers")}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="mk-btn" onClick={() => openBooking(dateValue, { adults: selPax, formule: cats.length > 1 ? selCat : undefined })}>
+                  {t("pk_book")}
+                  <span className="mk-btn-arrow"><Arrow size={14} /></span>
+                </button>
+                <p className="mk-pk-book-note">{t("pk_no_pay")}</p>
+              </div>
+              {(phones.length > 0 || wa) && (
+                <div className="mk-pk-ask">
+                  <b>{t("pk_question")}</b>
+                  {phones.map((p) => <a key={p} href={`tel:${p.replace(/[^\d+]/g, "")}`}>{p}</a>)}
+                  {wa && <a href={wa} target="_blank" rel="noreferrer">WhatsApp</a>}
+                </div>
+              )}
+            </aside>
           </div>
         </div>
-
-        {/* ── Full-bleed gallery strip ── */}
-        {images.length > 1 && (
-          <section className="mk-pk-strip" id="ch-gallery" data-chapter="">
-            <div className="mk-wrap">
-              <div className="mk-pk-strip-head">
-                <span className="mk-eyebrow">{t("pk_gallery")}</span>
-                <span className="mk-pk-strip-count">{String(images.length).padStart(2, "0")} {t("pk_photos")}</span>
-              </div>
-            </div>
-            <div className="mk-pk-strip-rail">
-              {images.map((src, i) => (
-                <button key={src} onClick={() => setLb(i)} aria-label={`${t("pk_gallery")} ${i + 1}`}>
-                  <img src={src} alt="" loading={i > 2 ? "lazy" : undefined} />
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* mobile CTA bar */}
         <div className="mk-pk-mobilebar">
@@ -650,19 +767,7 @@ export default function PackagePage({ previewDoc = null }) {
         />
       )}
 
-      {booking && (
-        <GoogleReCaptchaProvider reCaptchaKey={RECAPTCHA_SITE_KEY}>
-          <ReservationProvider>
-            <BookingFlow
-              pkg={pkg}
-              preview={preview}
-              prefill={{ adults: searchParams.get("adults"), date: searchParams.get("date") }}
-              initialDateIdx={bookDateIdx}
-              onClose={() => { setBooking(false); setBookDateIdx(null); }}
-            />
-          </ReservationProvider>
-        </GoogleReCaptchaProvider>
-      )}
+      {!preview && <WhatsAppButton packageTitle={pkg.title || pkg.destination} />}
     </div>
   );
 }

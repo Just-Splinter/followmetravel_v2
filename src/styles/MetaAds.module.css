@@ -42,9 +42,9 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  background: var(--success-bg, #eafaf1);
-  border: 1px solid var(--success, #27ae60);
-  color: var(--success, #27ae60);
+  background: var(--success-bg, var(--adm-success-bg));
+  border: 1px solid var(--success, var(--adm-success));
+  color: var(--success, var(--adm-success));
   border-radius: var(--radius-md);
   padding: 6px 14px;
   font-size: 12px;
@@ -54,7 +54,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--success, #27ae60);
+  background: var(--success, var(--adm-success));
   flex-shrink: 0;
 }
 
@@ -264,7 +264,7 @@
 .btnGhostSm {
   background: none;
   border: none;
-  color: var(--danger, #e74c3c);
+  color: var(--danger, var(--adm-danger));
   font-size: 11px;
   cursor: pointer;
   padding: 4px 0;
@@ -278,7 +278,7 @@
   gap: 10px;
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #1877f2 0%, #0d5fc0 100%);
+  background: linear-gradient(135deg, #1877f2 0%, var(--adm-info-fg) 100%);
   border: none;
   border-radius: var(--radius-md);
   color: #fff;
@@ -295,9 +295,9 @@
 
 /* ── State boxes ─────────────────────────────────── */
 .errorBox {
-  background: var(--danger-bg, #fef0ee);
-  border: 1px solid var(--danger, #e74c3c);
-  color: var(--danger, #e74c3c);
+  background: var(--danger-bg, var(--adm-danger-bg));
+  border: 1px solid var(--danger, var(--adm-danger));
+  color: var(--danger, var(--adm-danger));
   border-radius: var(--radius-md);
   padding: 10px 14px;
   font-size: 13px;
@@ -306,13 +306,13 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--success-bg, #eafaf1);
-  border: 1px solid var(--success, #27ae60);
+  background: var(--success-bg, var(--adm-success-bg));
+  border: 1px solid var(--success, var(--adm-success));
   border-radius: var(--radius-md);
   padding: 14px 18px;
 }
 .successIcon { font-size: 22px; }
-.successTitle { font-size: 14px; font-weight: 700; color: var(--success, #27ae60); }
+.successTitle { font-size: 14px; font-weight: 700; color: var(--success, var(--adm-success)); }
 .successSub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
 .emptyState {
@@ -439,12 +439,12 @@
 @media (max-width: 680px) { .reviewGrid { grid-template-columns: 1fr; } }
 
 .launchNotice {
-  background: var(--warning-bg, #fef9e7);
-  border: 1px solid var(--warning, #f39c12);
+  background: var(--warning-bg, var(--adm-warning-bg));
+  border: 1px solid var(--warning, var(--adm-warning));
   border-radius: var(--radius-md);
   padding: 12px 16px;
   font-size: 13px;
-  color: var(--warning-text, #7d6608);
+  color: var(--warning-text, var(--adm-warning-fg));
 }
 
 /* ── Spinner ─────────────────────────────────────── */
@@ -489,7 +489,7 @@
   font-size: 13px;
 }
 .logRow:last-child { border-bottom: none; }
-.logCheck { color: var(--success, #27ae60); font-weight: 700; flex-shrink: 0; }
+.logCheck { color: var(--success, var(--adm-success)); font-weight: 700; flex-shrink: 0; }
 .logLabel { flex: 1; color: var(--text-primary); }
 .logId    { font-size: 11px; color: var(--text-muted); background: var(--surface-3); padding: 2px 7px; border-radius: 4px; }
 

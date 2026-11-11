@@ -135,7 +135,7 @@ function OmraModal({ pkg, onSave, onClose }) {
           />
 
           {err && <p className="cms-status-bar error" style={{ marginTop: 12 }}>⚠ {err}</p>}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+          <div className="adm-modal-footer">
             <button className="em-btn-secondary" onClick={onClose}>Annuler</button>
             <button className="em-primary-btn" onClick={save} disabled={saving}>
               {saving ? "⏳ Enregistrement…" : "Enregistrer"}
@@ -230,7 +230,7 @@ export default function OmraManager() {
               <span
                 className="cms-badge"
                 style={o.status === "draft"
-                  ? { background: "rgba(255,117,14,0.1)", color: "#c4733a" }
+                  ? { background: "rgba(255,117,14,0.1)", color: "#ff750e" }
                   : { background: "#f0fdf4", color: "#15803d" }}
               >
                 {o.status}

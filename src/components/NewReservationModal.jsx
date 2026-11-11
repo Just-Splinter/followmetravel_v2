@@ -59,7 +59,7 @@ function Field({ label, required, children }) {
 
 /**
  * Manual "phone/walk-in booking" entry — bypasses the public site's
- * BookingFlow wizard and its captcha-protected Appwrite Function entirely.
+ * BookingFlow wizard and its captcha-protected POST /v1/reservations entirely.
  * Deliberately simpler than that wizard: no room-by-room hotel picker, the
  * admin just types the client info, dates and total directly since they're
  * the trusted source here (there's no client input to distrust). Hotel/room
@@ -355,7 +355,7 @@ export default function NewReservationModal({ open, onClose, onCreate, notify, r
             </Field>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+          <div className="adm-modal-footer">
             <button
               type="button"
               onClick={onClose}

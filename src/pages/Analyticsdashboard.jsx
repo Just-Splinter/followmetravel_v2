@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import db, { Collections, Query } from "../services/database";
 import {
-  LayoutDashboard, TrendingUp, MousePointer, Package,
+  LayoutDashboard, Briefcase, TrendingUp, MousePointer, Package,
   ClipboardList, Users, Activity, Eye, Search, Heart, CreditCard,
   Calendar, X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Clock, Hourglass, FileText, Route, RefreshCw, Database,
@@ -16,24 +16,28 @@ import {
   Target, Flame, Sparkles
 } from "lucide-react";
 import "../styles/Analyticsdashboard.css";
+import BusinessOverview from "./analytics/BusinessOverview";
+import { ADM, GRID } from "../styles/adminTokens";
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────
+// Couleurs du design system admin (styles/adminTokens.js). Les noms
+// historiques sont gardés : « purple » est l'accent principal (orange marque).
 const T = {
-  purple: "#7F77DD",
-  purpleDim: "#EEEDFE",
-  purpleDark: "#534AB7",
-  teal: "#1D9E75",
-  tealDim: "#E1F5EE",
-  tealDark: "#0F6E56",
-  coral: "#D85A30",
-  coralDim: "#FAECE7",
-  amber: "#BA7517",
-  amberDim: "#FAEEDA",
-  blue: "#378ADD",
-  blueDim: "#E6F1FB",
-  blueDark: "#185FA5",
-  gray: "#888780",
-  grid: "rgba(0,0,0,0.05)",
+  purple: ADM.brand,
+  purpleDim: ADM.brandSoft,
+  purpleDark: ADM.brandHover,
+  teal: ADM.success,
+  tealDim: ADM.successBg,
+  tealDark: "#15803d",
+  coral: ADM.violet,
+  coralDim: ADM.violetBg,
+  amber: ADM.warning,
+  amberDim: ADM.warningBg,
+  blue: ADM.info,
+  blueDim: ADM.infoBg,
+  blueDark: "#1d4ed8",
+  gray: ADM.muted,
+  grid: GRID,
 };
 
 const PAGE_SIZE = 25;
@@ -46,7 +50,8 @@ const RANGES = [
 ];
 
 const NAV = [
-  { key: "overview", label: "Vue d'ensemble", icon: LayoutDashboard },
+  { key: "business", label: "Vue business", icon: Briefcase },
+  { key: "overview", label: "Activité du site", icon: LayoutDashboard },
   { key: "traffic", label: "Trafic", icon: BarChart3 },
   { key: "conversion", label: "Conversion", icon: TrendingUp },
   { key: "content", label: "Contenu", icon: Package },
@@ -56,13 +61,13 @@ const NAV = [
 
 const BADGE = {
   page_view: { bg: T.purpleDim, text: T.purpleDark },
-  click: { bg: T.coralDim, text: "#993C1D" },
-  search: { bg: T.amberDim, text: "#854F0B" },
-  favorite: { bg: "#FBEAF0", text: "#993556" },
+  click: { bg: T.coralDim, text: "#b91c1c" },
+  search: { bg: T.amberDim, text: "#92400e" },
+  favorite: { bg: "#fef2f2", text: "#b91c1c" },
   view: { bg: T.blueDim, text: T.blueDark },
   payment: { bg: T.tealDim, text: T.tealDark },
-  abandon: { bg: "#FCEBEB", text: "#A32D2D" },
-  reserve: { bg: "#EAF3DE", text: "#3B6D11" },
+  abandon: { bg: "#fef2f2", text: "#b91c1c" },
+  reserve: { bg: "#f0fdf4", text: "#15803d" },
 };
 
 const EVENT_ICON = {
@@ -167,7 +172,7 @@ const ANALYTICS_CSS = `
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #7F77DD, #534AB7);
+  background: linear-gradient(135deg, #ff750e, #ea6a08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -212,9 +217,9 @@ const ANALYTICS_CSS = `
 
 .an-nav-item.active {
   background: linear-gradient(135deg, rgba(127, 119, 221, 0.1), rgba(127, 119, 221, 0.05));
-  color: #534AB7;
+  color: #ea6a08;
   font-weight: 600;
-  box-shadow: inset 3px 0 0 #7F77DD;
+  box-shadow: inset 3px 0 0 #ff750e;
 }
 
 .an-nav-item .an-nav-icon {
@@ -254,14 +259,14 @@ const ANALYTICS_CSS = `
 }
 
 .an-range-pill:hover {
-  border-color: #7F77DD;
-  color: #7F77DD;
+  border-color: #ff750e;
+  color: #ff750e;
 }
 
 .an-range-pill.active {
-  border-color: #7F77DD;
-  background: #EEEDFE;
-  color: #534AB7;
+  border-color: #ff750e;
+  background: #fff4eb;
+  color: #ea6a08;
   font-weight: 600;
 }
 
@@ -284,9 +289,9 @@ const ANALYTICS_CSS = `
 }
 
 .an-refresh-btn:hover {
-  border-color: #7F77DD;
-  color: #7F77DD;
-  background: #EEEDFE;
+  border-color: #ff750e;
+  color: #ff750e;
+  background: #fff4eb;
 }
 
 .an-refresh-btn.loading svg {
@@ -323,7 +328,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-header-title .an-header-icon {
-  color: #7F77DD;
+  color: #ff750e;
 }
 
 .an-header-subtitle {
@@ -342,7 +347,7 @@ const ANALYTICS_CSS = `
 
 .an-header-loading svg {
   animation: anSpin 1s linear infinite;
-  color: #7F77DD;
+  color: #ff750e;
 }
 
 /* ─── Error ─── */
@@ -439,13 +444,13 @@ const ANALYTICS_CSS = `
 }
 
 .an-kpi-delta.positive {
-  background: #E1F5EE;
-  color: #0F6E56;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .an-kpi-delta.negative {
-  background: #FCEBEB;
-  color: #A32D2D;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .an-kpi-value {
@@ -593,7 +598,7 @@ const ANALYTICS_CSS = `
   gap: 6px;
   padding: 5px 0 5px 14px;
   font-size: 11px;
-  color: #D85A30;
+  color: #7c3aed;
   font-weight: 500;
 }
 
@@ -731,7 +736,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-search-input:focus {
-  border-color: #7F77DD;
+  border-color: #ff750e;
   box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.1);
 }
 
@@ -754,7 +759,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-select:focus {
-  border-color: #7F77DD;
+  border-color: #ff750e;
   box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.1);
 }
 
@@ -801,7 +806,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-table thead tr {
-  background: #fafafa;
+  background: #f8fafc;
 }
 
 .an-table th {
@@ -824,11 +829,11 @@ const ANALYTICS_CSS = `
 
 .an-table th.sortable:hover {
   background: #f1f5f9;
-  color: #7F77DD;
+  color: #ff750e;
 }
 
 .an-table th.sorted {
-  color: #7F77DD;
+  color: #ff750e;
   background: rgba(127, 119, 221, 0.05);
 }
 
@@ -846,7 +851,7 @@ const ANALYTICS_CSS = `
 .an-table th.sortable:hover .an-sort-icon,
 .an-table th.sorted .an-sort-icon {
   opacity: 1;
-  color: #7F77DD;
+  color: #ff750e;
 }
 
 .an-table td {
@@ -867,7 +872,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-row-even {
-  background: #fafafa;
+  background: #f8fafc;
 }
 
 .an-cell-muted {
@@ -907,8 +912,8 @@ const ANALYTICS_CSS = `
   padding: 4px 10px;
   border-radius: 6px;
   cursor: pointer;
-  background: #EEEDFE;
-  color: #534AB7;
+  background: #fff4eb;
+  color: #ea6a08;
   border: 1px solid rgba(127, 119, 221, 0.2);
   font-weight: 600;
   display: inline-flex;
@@ -919,7 +924,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-session-btn:hover {
-  background: #7F77DD;
+  background: #ff750e;
   color: #fff;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(127, 119, 221, 0.3);
@@ -945,7 +950,7 @@ const ANALYTICS_CSS = `
   justify-content: space-between;
   padding: 12px 18px;
   border-top: 1px solid #e2e8f0;
-  background: #fafafa;
+  background: #f8fafc;
   flex-wrap: wrap;
   gap: 10px;
 }
@@ -979,14 +984,14 @@ const ANALYTICS_CSS = `
 }
 
 .an-page-btn:hover:not(:disabled) {
-  border-color: #7F77DD;
-  color: #7F77DD;
-  background: #EEEDFE;
+  border-color: #ff750e;
+  color: #ff750e;
+  background: #fff4eb;
 }
 
 .an-page-btn.active {
-  background: #7F77DD;
-  border-color: #7F77DD;
+  background: #ff750e;
+  border-color: #ff750e;
   color: #fff;
   box-shadow: 0 2px 8px rgba(127, 119, 221, 0.3);
 }
@@ -1053,9 +1058,9 @@ const ANALYTICS_CSS = `
 }
 
 .an-back-btn:hover {
-  border-color: #7F77DD;
-  color: #7F77DD;
-  background: #EEEDFE;
+  border-color: #ff750e;
+  color: #ff750e;
+  background: #fff4eb;
 }
 
 .an-session-id {
@@ -1063,7 +1068,7 @@ const ANALYTICS_CSS = `
   font-weight: 600;
   color: #1e293b;
   font-family: 'JetBrains Mono', monospace;
-  color: #534AB7;
+  color: #ea6a08;
 }
 
 .an-session-time {
@@ -1089,13 +1094,13 @@ const ANALYTICS_CSS = `
 }
 
 .an-session-badge.payment {
-  background: #E1F5EE;
-  color: #0F6E56;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .an-session-badge.reserve {
-  background: #EAF3DE;
-  color: #3B6D11;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 /* ─── Tabs ─── */
@@ -1134,9 +1139,9 @@ const ANALYTICS_CSS = `
 }
 
 .an-tab.active {
-  color: #534AB7;
+  color: #ea6a08;
   font-weight: 600;
-  border-bottom-color: #7F77DD;
+  border-bottom-color: #ff750e;
 }
 
 /* ─── Timeline ─── */
@@ -1259,8 +1264,8 @@ const ANALYTICS_CSS = `
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #EEEDFE;
-  color: #534AB7;
+  background: #fff4eb;
+  color: #ea6a08;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1272,7 +1277,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-path-step:hover .an-path-num {
-  background: #7F77DD;
+  background: #ff750e;
   color: #fff;
   transform: scale(1.1);
 }
@@ -1300,7 +1305,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-path-card:hover {
-  border-color: #7F77DD;
+  border-color: #ff750e;
   background: #fff;
   box-shadow: 0 4px 12px rgba(127, 119, 221, 0.08);
 }
@@ -1330,7 +1335,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-path-meta-long {
-  color: #1D9E75;
+  color: #16a34a;
   font-weight: 600;
 }
 
@@ -1401,7 +1406,7 @@ const ANALYTICS_CSS = `
 }
 
 .an-replay-row:nth-child(even) {
-  background: #fafafa;
+  background: #f8fafc;
 }
 
 .an-replay-elapsed {
@@ -1451,7 +1456,7 @@ const ANALYTICS_CSS = `
 
 .an-loading svg {
   animation: anSpin 1s linear infinite;
-  color: #7F77DD;
+  color: #ff750e;
 }
 
 /* ─── Skeleton ─── */
@@ -1697,7 +1702,7 @@ function SectionHead({ title, sub, icon: Icon }) {
   return (
     <div className="an-section-head">
       <div className="an-section-title">
-        {Icon && <Icon size={15} style={{ color: "#7F77DD" }} />}
+        {Icon && <Icon size={15} style={{ color: "#ff750e" }} />}
         {title}
       </div>
       {sub && <div className="an-section-sub">{sub}</div>}
@@ -1965,7 +1970,7 @@ function EventLog({ rangeIdx, filterEvent, filterDevice, search, onSessionClick 
                   </td>
                 </tr>
               ) : rows.map((row, i) => {
-                const b = BADGE[row.event] ?? { bg: "#f1f5f9", text: "#5F5E5A" };
+                const b = BADGE[row.event] ?? { bg: "#f1f5f9", text: "#64748b" };
                 return (
                   <tr
                     key={row.$id ?? i}
@@ -2117,10 +2122,10 @@ function SessionList({ rangeIdx, onSessionClick }) {
 
       <div className="an-session-stats">
         {[
-          { label: "Sessions", value: nf(filtered.length), color: "#7F77DD" },
-          { label: "Connectés", value: nf(new Set(sessions.filter(s => s.userId).map(s => s.userId)).size), color: "#378ADD" },
-          { label: "Moy. events/session", value: filtered.length ? nf(filtered.reduce((a, s) => a + s.events.length, 0) / filtered.length) : "—", color: "#1D9E75" },
-          { label: "Moy. durée", value: filtered.length ? fmtDuration(filtered.reduce((a, s) => a + durationMs(s.events), 0) / filtered.length) : "—", color: "#BA7517" },
+          { label: "Sessions", value: nf(filtered.length), color: "#ff750e" },
+          { label: "Connectés", value: nf(new Set(sessions.filter(s => s.userId).map(s => s.userId)).size), color: "#2563eb" },
+          { label: "Moy. events/session", value: filtered.length ? nf(filtered.reduce((a, s) => a + s.events.length, 0) / filtered.length) : "—", color: "#16a34a" },
+          { label: "Moy. durée", value: filtered.length ? fmtDuration(filtered.reduce((a, s) => a + durationMs(s.events), 0) / filtered.length) : "—", color: "#d97706" },
         ].map((s, i) => (
           <div key={s.label} className="an-session-stat" style={{ animationDelay: `${i * 0.05}s` }}>
             <div className="an-session-stat-value" style={{ color: s.color }}>{s.value}</div>
@@ -2161,7 +2166,7 @@ function SessionList({ rangeIdx, onSessionClick }) {
                         className={`an-row ${i % 2 === 1 ? "an-row-even" : ""}`}
                         style={{ animationDelay: `${Math.min(i * 0.03, 0.3)}s` }}
                       >
-                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#534AB7", fontWeight: 600 }}>
+                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#ea6a08", fontWeight: 600 }}>
                           {s.sessionId.slice(0, 12)}…
                         </td>
                         <td className="an-cell-muted" style={{ whiteSpace: "nowrap" }}>
@@ -2191,7 +2196,7 @@ function SessionList({ rangeIdx, onSessionClick }) {
                         </td>
                         <td style={{ fontSize: 11 }}>
                           {s.userId ? (
-                            <span style={{ color: "#185FA5", fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}>
+                            <span style={{ color: "#1d4ed8", fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}>
                               {s.userId.slice(0, 8)}…
                             </span>
                           ) : <span style={{ opacity: 0.5 }}>anonyme</span>}
@@ -2344,12 +2349,12 @@ function SessionDetail({ sessionId, onBack }) {
 
       <div className="an-session-stats">
         {[
-          { label: "Durée", value: fmtDuration(kpi.duration), icon: Clock, color: "#7F77DD", bg: "#EEEDFE" },
-          { label: "Événements", value: nf(kpi.total), icon: ClipboardList, color: "#378ADD", bg: "#E6F1FB" },
-          { label: "Pages", value: nf(kpi.pages), icon: Eye, color: "#1D9E75", bg: "#E1F5EE" },
-          { label: "Clics", value: nf(kpi.clicks), icon: MousePointer, color: "#D85A30", bg: "#FAECE7" },
-          { label: "Recherches", value: nf(kpi.searches), icon: Search, color: "#BA7517", bg: "#FAEEDA" },
-          { label: "Appareil", value: kpi.device, icon: DeviceIcon, color: "#888780", bg: "#f1f5f9" },
+          { label: "Durée", value: fmtDuration(kpi.duration), icon: Clock, color: "#ff750e", bg: "#fff4eb" },
+          { label: "Événements", value: nf(kpi.total), icon: ClipboardList, color: "#2563eb", bg: "#eff6ff" },
+          { label: "Pages", value: nf(kpi.pages), icon: Eye, color: "#16a34a", bg: "#f0fdf4" },
+          { label: "Clics", value: nf(kpi.clicks), icon: MousePointer, color: "#7c3aed", bg: "#f5f3ff" },
+          { label: "Recherches", value: nf(kpi.searches), icon: Search, color: "#d97706", bg: "#fffbeb" },
+          { label: "Appareil", value: kpi.device, icon: DeviceIcon, color: "#64748b", bg: "#f1f5f9" },
         ].map((k, i) => {
           const Icon = k.icon;
           return (
@@ -2390,7 +2395,7 @@ function SessionDetail({ sessionId, onBack }) {
           <SectionHead title="Timeline des événements" sub={`${sorted.length} événements dans l'ordre chronologique`} icon={Activity} />
           <div className="an-timeline">
             {sorted.map((e, i) => {
-              const b = BADGE[e.event] ?? { bg: "#f1f5f9", text: "#5F5E5A" };
+              const b = BADGE[e.event] ?? { bg: "#f1f5f9", text: "#64748b" };
               const Icon = EVENT_ICON[e.event] ?? Activity;
               const isLast = i === sorted.length - 1;
               const next = sorted[i + 1];
@@ -2470,7 +2475,7 @@ function SessionDetail({ sessionId, onBack }) {
                       <div className="an-path-card">
                         <div className="an-path-card-header">
                           <div className="an-path-page">
-                            <FileText size={14} style={{ color: "#7F77DD" }} />
+                            <FileText size={14} style={{ color: "#ff750e" }} />
                             {step.page}
                           </div>
                           <div className="an-path-meta">
@@ -2488,7 +2493,7 @@ function SessionDetail({ sessionId, onBack }) {
                       {step.actions.length > 0 && (
                         <div className="an-path-actions">
                           {step.actions.map((a, j) => {
-                            const b = BADGE[a.event] ?? { bg: "#f1f5f9", text: "#5F5E5A" };
+                            const b = BADGE[a.event] ?? { bg: "#f1f5f9", text: "#64748b" };
                             const Icon = EVENT_ICON[a.event] ?? Activity;
                             return (
                               <div key={j} className="an-path-action">
@@ -2528,7 +2533,7 @@ function SessionDetail({ sessionId, onBack }) {
           </div>
           <div className="an-replay">
             {sorted.map((e, i) => {
-              const b = BADGE[e.event] ?? { bg: "#f1f5f9", text: "#5F5E5A" };
+              const b = BADGE[e.event] ?? { bg: "#f1f5f9", text: "#64748b" };
               const isFirst = i === 0;
               const dt = isFirst ? 0 : new Date(e.createdAt) - new Date(sorted[0].createdAt);
               const elapsed = `+${fmtDuration(dt)}`;
@@ -2566,7 +2571,7 @@ function SessionDetail({ sessionId, onBack }) {
 export default function AnalyticsDashboard() {
   useInjectStyles();
 
-  const [section, setSection] = useState("overview");
+  const [section, setSection] = useState("business");
   const [rangeIdx, setRangeIdx] = useState(1);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2642,7 +2647,7 @@ export default function AnalyticsDashboard() {
     { label: "Sessions", value: kpi.visitors },
     { label: "Packages consultés", value: kpi.pkgViews },
     { label: "Réservations lancées", value: kpi.reserves },
-    { label: "Paiements complétés", value: kpi.payments },
+    { label: "Demandes envoyées", value: kpi.payments },
   ], [kpi]);
 
   const eventTypes = useMemo(() => ["all", ...new Set(events.map((e) => e.event).filter(Boolean))], [events]);
@@ -2740,15 +2745,20 @@ export default function AnalyticsDashboard() {
         )}
 
         {/* OVERVIEW */}
+        {/* BUSINESS — agrégats serveur, indépendants du chargement des événements bruts */}
+        {section === "business" && !activeSession && (
+          <BusinessOverview days={RANGES[rangeIdx].days} rangeLabel={RANGES[rangeIdx].label} />
+        )}
+
         {section === "overview" && isLoaded && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div className="an-kpi-grid">
-              <KpiCard icon={Users} label="Sessions" value={nf(kpi.visitors)} delta={12} color={T.purple} dimColor={T.purpleDim} delay={0} />
-              <KpiCard icon={Zap} label="Connectés" value={nf(kpi.users)} delta={8} color={T.blue} dimColor={T.blueDim} delay={1} />
-              <KpiCard icon={Eye} label="Pages vues" value={nf(kpi.pageViews)} delta={-3} color={T.teal} dimColor={T.tealDim} delay={2} />
-              <KpiCard icon={Search} label="Recherches" value={nf(kpi.searches)} delta={21} color={T.amber} dimColor={T.amberDim} delay={3} />
-              <KpiCard icon={MousePointer} label="Clics" value={nf(kpi.clicks)} delta={5} color={T.coral} dimColor={T.coralDim} delay={4} />
-              <KpiCard icon={Target} label="Conversion" value={kpi.convRate + "%"} delta={kpi.convRate > 50 ? 2 : -4} color={T.purple} dimColor={T.purpleDim} delay={5} />
+              <KpiCard icon={Users} label="Sessions" value={nf(kpi.visitors)} color={T.purple} dimColor={T.purpleDim} delay={0} />
+              <KpiCard icon={Zap} label="Connectés" value={nf(kpi.users)} color={T.blue} dimColor={T.blueDim} delay={1} />
+              <KpiCard icon={Eye} label="Pages vues" value={nf(kpi.pageViews)} color={T.teal} dimColor={T.tealDim} delay={2} />
+              <KpiCard icon={Search} label="Recherches" value={nf(kpi.searches)} color={T.amber} dimColor={T.amberDim} delay={3} />
+              <KpiCard icon={MousePointer} label="Clics" value={nf(kpi.clicks)} color={T.coral} dimColor={T.coralDim} delay={4} />
+              <KpiCard icon={Target} label="Ouvertures → demandes" value={kpi.convRate + "%"} color={T.purple} dimColor={T.purpleDim} delay={5} />
             </div>
 
             <div className="an-card">
@@ -2789,10 +2799,10 @@ export default function AnalyticsDashboard() {
         {section === "traffic" && isLoaded && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div className="an-kpi-grid">
-              <KpiCard icon={Users} label="Sessions" value={nf(kpi.visitors)} delta={12} color={T.purple} dimColor={T.purpleDim} delay={0} />
-              <KpiCard icon={Eye} label="Pages vues" value={nf(kpi.pageViews)} delta={-3} color={T.teal} dimColor={T.tealDim} delay={1} />
-              <KpiCard icon={Search} label="Recherches" value={nf(kpi.searches)} delta={21} color={T.amber} dimColor={T.amberDim} delay={2} />
-              <KpiCard icon={Heart} label="Favoris" value={nf(kpi.favorites)} delta={7} color={T.coral} dimColor={T.coralDim} delay={3} />
+              <KpiCard icon={Users} label="Sessions" value={nf(kpi.visitors)} color={T.purple} dimColor={T.purpleDim} delay={0} />
+              <KpiCard icon={Eye} label="Pages vues" value={nf(kpi.pageViews)} color={T.teal} dimColor={T.tealDim} delay={1} />
+              <KpiCard icon={Search} label="Recherches" value={nf(kpi.searches)} color={T.amber} dimColor={T.amberDim} delay={2} />
+              <KpiCard icon={Heart} label="Favoris" value={nf(kpi.favorites)} color={T.coral} dimColor={T.coralDim} delay={3} />
             </div>
 
             <div className="an-card">
@@ -2846,10 +2856,10 @@ export default function AnalyticsDashboard() {
         {section === "conversion" && isLoaded && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div className="an-kpi-grid">
-              <KpiCard icon={Calendar} label="Réservations" value={nf(kpi.reserves)} delta={9} color={T.purple} dimColor={T.purpleDim} delay={0} />
-              <KpiCard icon={CreditCard} label="Paiements" value={nf(kpi.payments)} delta={14} color={T.teal} dimColor={T.tealDim} delay={1} />
-              <KpiCard icon={TrendingUp} label="Conversion" value={kpi.convRate + "%"} delta={2} color={T.blue} dimColor={T.blueDim} delay={2} />
-              <KpiCard icon={X} label="Abandons" value={nf(kpi.abandons)} delta={-5} color={T.coral} dimColor={T.coralDim} delay={3} />
+              <KpiCard icon={Calendar} label="Réservations" value={nf(kpi.reserves)} color={T.purple} dimColor={T.purpleDim} delay={0} />
+              <KpiCard icon={CreditCard} label="Demandes envoyées" value={nf(kpi.payments)} color={T.teal} dimColor={T.tealDim} delay={1} />
+              <KpiCard icon={TrendingUp} label="Ouvertures → demandes" value={kpi.convRate + "%"} color={T.blue} dimColor={T.blueDim} delay={2} />
+              <KpiCard icon={X} label="Abandons" value={nf(kpi.abandons)} color={T.coral} dimColor={T.coralDim} delay={3} />
             </div>
 
             <div className="an-card-grid">
@@ -2869,10 +2879,10 @@ export default function AnalyticsDashboard() {
         {section === "content" && isLoaded && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div className="an-kpi-grid">
-              <KpiCard icon={Package} label="Packages vus" value={nf(kpi.pkgViews)} delta={18} color={T.blue} dimColor={T.blueDim} delay={0} />
-              <KpiCard icon={Heart} label="Favoris" value={nf(kpi.favorites)} delta={7} color={T.coral} dimColor={T.coralDim} delay={1} />
-              <KpiCard icon={Search} label="Recherches" value={nf(kpi.searches)} delta={21} color={T.amber} dimColor={T.amberDim} delay={2} />
-              <KpiCard icon={MousePointer} label="Clics CTA" value={nf(kpi.clicks)} delta={5} color={T.purple} dimColor={T.purpleDim} delay={3} />
+              <KpiCard icon={Package} label="Packages vus" value={nf(kpi.pkgViews)} color={T.blue} dimColor={T.blueDim} delay={0} />
+              <KpiCard icon={Heart} label="Favoris" value={nf(kpi.favorites)} color={T.coral} dimColor={T.coralDim} delay={1} />
+              <KpiCard icon={Search} label="Recherches" value={nf(kpi.searches)} color={T.amber} dimColor={T.amberDim} delay={2} />
+              <KpiCard icon={MousePointer} label="Clics CTA" value={nf(kpi.clicks)} color={T.purple} dimColor={T.purpleDim} delay={3} />
             </div>
 
             <div className="an-card-grid">

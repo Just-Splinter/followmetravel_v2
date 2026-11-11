@@ -46,10 +46,27 @@ export const EMAIL_VARIABLE_GROUPS = [
     ],
   },
   {
+    label: "Voyage & échéances",
+    variables: [
+      { key: "reservation_travel_start", description: "Date de départ réelle (JJ/MM/AAAA)", preview: "15/06/2027" },
+      { key: "reservation_travel_end", description: "Date de retour réelle (JJ/MM/AAAA)", preview: "22/06/2027" },
+      { key: "installment_label", description: "Échéance concernée (rappel de paiement)", preview: "Acompte 30 %" },
+      { key: "installment_amount", description: "Montant restant de l'échéance (DH)", preview: "5 550" },
+      { key: "installment_due_date", description: "Date limite de l'échéance", preview: "20/05/2027" },
+      { key: "installment_days_late", description: "Jours de retard (0 si à venir)", preview: "3" },
+      { key: "package_url", description: "Lien vers la fiche du voyage (relance d'abandon)", preview: "https://followmetravel.ma/packages/view?pkgId=…" },
+    ],
+  },
+  {
     label: "Entreprise",
     variables: [
       { key: "company_name", description: "Nom de l'agence", preview: "Follow Me Travel" },
       { key: "site_url", description: "URL du site public", preview: "https://followmetravel.ma" },
+      { key: "agency_phone", description: "Téléphones de l'agence (fiche agence)", preview: "+212 664 586 425" },
+      { key: "agency_whatsapp", description: "Numéro WhatsApp", preview: "+212664586425" },
+      { key: "agency_email", description: "Email de l'agence", preview: "contact@followmetravel.ma" },
+      { key: "client_space_url", description: "Lien vers l'espace client (valider ou annuler la réservation)", preview: "https://www.followmetravel.ma/profil#reservations" },
+      { key: "agency_rib", description: "Banque et RIB pour les virements", preview: "Banque — 000 000 …" },
     ],
   },
 ];

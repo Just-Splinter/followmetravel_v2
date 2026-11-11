@@ -1,0 +1,238 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Design system du back-office (dashboard)
+   ───────────────────────────────────────────────────────────────────────
+   Source unique des couleurs, rayons, ombres et typographie de l'admin.
+   Équivalent JS (graphiques, couleurs calculées) : src/styles/adminTokens.js
+   — les deux doivent rester alignés.
+
+   Règles :
+   • Accent unique : l'orange de la marque (--adm-brand). Pas d'autre couleur
+     « décorative » pour les actions.
+   • Couleurs de sens seulement pour un état : succès (vert), attention
+     (ambre), danger (rouge), info (bleu).
+   • Neutres : échelle slate (texte, bordures, fonds).
+   • Graphiques : palette --adm-chart-1…6, dans cet ordre.
+
+   Le thème est actif quand <body> porte la classe `adm` (posée par Layout
+   tant qu'une page /dashboard est affichée) : il couvre aussi les modales
+   rendues hors du conteneur, et ne touche jamais au site public.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Marque */
+  --adm-brand: #ff750e;
+  --adm-brand-hover: #ea6a08;
+  --adm-brand-soft: #fff4eb;
+  --adm-brand-line: rgba(255, 117, 14, 0.3);
+
+  /* Neutres (slate) */
+  --adm-ink: #0f172a;        /* titres */
+  --adm-text: #1e293b;       /* texte courant */
+  --adm-text-2: #475569;     /* texte secondaire */
+  --adm-muted: #64748b;      /* libellés */
+  --adm-subtle: #94a3b8;     /* aides, placeholders */
+  --adm-line: #e2e8f0;       /* bordures */
+  --adm-line-strong: #cbd5e1;
+  --adm-bg: #f8fafc;         /* fond de page */
+  --adm-surface: #ffffff;    /* cartes, tableaux, modales */
+  --adm-surface-2: #f1f5f9;  /* survols, en-têtes de tableau */
+
+  /* Sémantique : texte / fond / bordure */
+  --adm-success: #16a34a;  --adm-success-fg: #15803d;  --adm-success-bg: #f0fdf4;  --adm-success-line: #bbf7d0;
+  --adm-warning: #d97706;  --adm-warning-fg: #92400e;  --adm-warning-bg: #fffbeb;  --adm-warning-line: #fde68a;
+  --adm-danger: #dc2626;   --adm-danger-fg: #b91c1c;   --adm-danger-bg: #fef2f2;   --adm-danger-line: #fecaca;
+  --adm-info: #2563eb;     --adm-info-fg: #1d4ed8;     --adm-info-bg: #eff6ff;     --adm-info-line: #bfdbfe;
+
+  /* Graphiques (ordre d'usage) */
+  --adm-chart-1: #ff750e;
+  --adm-chart-2: #2563eb;
+  --adm-chart-3: #16a34a;
+  --adm-chart-4: #7c3aed;
+  --adm-chart-5: #0891b2;
+  --adm-chart-6: #d97706;
+
+  /* Formes */
+  --adm-radius-sm: 6px;
+  --adm-radius: 10px;
+  --adm-radius-lg: 14px;
+  --adm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --adm-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --adm-shadow-lg: 0 20px 50px rgba(15, 23, 42, 0.18);
+  --adm-font: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* ── Thème clair imposé dans l'admin : variables.css bascule en sombre selon
+      le système, ce qui donnait du texte clair sur des fonds blancs. ───── */
+body.adm {
+  color-scheme: light;
+  --color-background-primary: var(--adm-surface);
+  --color-background-secondary: var(--adm-bg);
+  --color-background-tertiary: var(--adm-surface-2);
+  --color-background-info: var(--adm-info-bg);
+  --color-background-success: var(--adm-success-bg);
+  --color-background-warning: var(--adm-warning-bg);
+  --color-background-danger: var(--adm-danger-bg);
+  --color-text-primary: var(--adm-text);
+  --color-text-secondary: var(--adm-muted);
+  --color-text-tertiary: var(--adm-subtle);
+  --color-text-info: var(--adm-brand);
+  --color-text-success: var(--adm-success-fg);
+  --color-text-warning: var(--adm-warning-fg);
+  --color-text-danger: var(--adm-danger-fg);
+  --color-border-tertiary: var(--adm-line);
+  --color-border-secondary: var(--adm-line-strong);
+  --color-border-primary: var(--adm-subtle);
+  --color-border-info: var(--adm-info-line);
+  --color-border-success: var(--adm-success-line);
+  --color-border-warning: var(--adm-warning-line);
+  --color-border-danger: var(--adm-danger-line);
+  --color-accent: var(--adm-brand);
+  --color-accent-hover: var(--adm-brand-hover);
+  --color-accent-secondary: var(--adm-brand);
+  --color-accent-secondary-hover: var(--adm-brand-hover);
+  background: var(--adm-bg);
+  font-family: var(--adm-font);
+}
+
+/* ═══ Boutons : une seule famille visuelle ═══════════════════════════════
+   primary   : action principale de la page (orange plein)
+   secondary : action courante (contour)
+   danger    : suppression / action irréversible
+   Les anciennes classes (em-*, res-*, ed-*) sont alignées ici. */
+body.adm .res-btn,
+body.adm .em-primary-btn,
+body.adm .em-action-btn,
+body.adm .em-btn-secondary,
+body.adm .em-btn-danger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: var(--adm-font); font-size: 13px; font-weight: 600; line-height: 1.2;
+  padding: 9px 16px; border-radius: var(--adm-radius);
+  border: 1.5px solid var(--adm-line); background: var(--adm-surface); color: var(--adm-text-2);
+  box-shadow: none; transform: none; cursor: pointer; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+body.adm .res-btn:hover:not(:disabled),
+body.adm .em-action-btn:hover:not(:disabled),
+body.adm .em-btn-secondary:hover:not(:disabled) {
+  background: var(--adm-surface-2); border-color: var(--adm-line-strong); color: var(--adm-text); transform: none;
+}
+body.adm .res-btn.primary,
+body.adm .em-primary-btn,
+body.adm .em-action-btn.primary {
+  background: var(--adm-brand); border-color: var(--adm-brand); color: #fff; box-shadow: 0 1px 2px rgba(255, 117, 14, .25);
+}
+body.adm .res-btn.primary:hover:not(:disabled),
+body.adm .em-primary-btn:hover:not(:disabled),
+body.adm .em-action-btn.primary:hover:not(:disabled) {
+  background: var(--adm-brand-hover); border-color: var(--adm-brand-hover); color: #fff; transform: none;
+  box-shadow: 0 4px 12px rgba(255, 117, 14, .25);
+}
+body.adm .res-btn.danger,
+body.adm .em-btn-danger,
+body.adm .em-action-btn.danger {
+  background: var(--adm-danger-bg); border-color: var(--adm-danger-line); color: var(--adm-danger-fg);
+}
+body.adm .res-btn.danger:hover:not(:disabled),
+body.adm .em-btn-danger:hover:not(:disabled),
+body.adm .em-action-btn.danger:hover:not(:disabled) {
+  background: #fee2e2; border-color: var(--adm-danger); color: var(--adm-danger-fg);
+}
+body.adm .res-btn.success { background: var(--adm-success-bg); border-color: var(--adm-success-line); color: var(--adm-success-fg); }
+body.adm .res-btn.small,
+body.adm .em-action-btn { padding: 6px 12px; font-size: 12px; }
+body.adm .res-btn:disabled,
+body.adm .em-primary-btn:disabled,
+body.adm .em-action-btn:disabled { opacity: .5; cursor: not-allowed; }
+body.adm .res-btn:focus-visible,
+body.adm .em-primary-btn:focus-visible,
+body.adm .em-action-btn:focus-visible { outline: 2px solid var(--adm-brand); outline-offset: 2px; }
+
+/* ═══ Champs ═══════════════════════════════════════════════════════════ */
+body.adm .res-input, body.adm .res-select, body.adm .res-textarea {
+  border-radius: var(--adm-radius); border: 1.5px solid var(--adm-line); color: var(--adm-text); background: var(--adm-surface);
+}
+body.adm .res-input:focus, body.adm .res-select:focus, body.adm .res-textarea:focus {
+  border-color: var(--adm-brand); box-shadow: 0 0 0 3px var(--adm-brand-soft); outline: none;
+}
+
+/* ═══ Cartes et tableaux ═══════════════════════════════════════════════ */
+body.adm .res-table-wrap, body.adm .ops-card, body.adm .an-card, body.adm .bo-card, body.adm .bo-kpi, body.adm .cms-table-card {
+  border-radius: var(--adm-radius-lg); border-color: var(--adm-line); box-shadow: var(--adm-shadow);
+}
+body.adm .res-table th, body.adm .bo-table th {
+  color: var(--adm-muted); background: var(--adm-bg); font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+}
+/* Lignes cliquables (ouvrent le détail dans la modale commune) */
+body.adm tr.is-clickable { cursor: pointer; }
+body.adm tr.is-clickable:hover td { background: var(--adm-brand-soft); }
+
+/* Lien de tableau : ouvre le détail dans la modale commune */
+body.adm .adm-link {
+  background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--adm-brand);
+  cursor: pointer; text-align: left; text-decoration: none;
+}
+body.adm .adm-link:hover { text-decoration: underline; color: var(--adm-brand-hover); }
+body.adm .adm-link:focus-visible { outline: 2px solid var(--adm-brand); outline-offset: 2px; border-radius: 3px; }
+
+/* ═══ Badges / statuts : mêmes couleurs de sens partout ═══════════════ */
+body.adm .ops-badge.ok, body.adm .res-status.confirmed { color: var(--adm-success-fg); background: var(--adm-success-bg); border-color: var(--adm-success-line); }
+body.adm .ops-badge.warn, body.adm .res-status.pending { color: var(--adm-warning-fg); background: var(--adm-warning-bg); border-color: var(--adm-warning-line); }
+body.adm .ops-badge.danger, body.adm .res-status.cancelled { color: var(--adm-danger-fg); background: var(--adm-danger-bg); border-color: var(--adm-danger-line); }
+body.adm .ops-badge.info, body.adm .res-status.paid { color: var(--adm-info-fg); background: var(--adm-info-bg); border-color: var(--adm-info-line); }
+body.adm .ops-badge.muted, body.adm .res-status.completed { color: var(--adm-muted); background: var(--adm-surface-2); border-color: var(--adm-line); }
+
+/* ═══ Titres de page ═══════════════════════════════════════════════════ */
+body.adm .ops-title, body.adm .an-header-title, body.adm .pkg-page-title { color: var(--adm-ink); font-weight: 800; letter-spacing: -.01em; }
+body.adm .ops-sub, body.adm .pkg-page-subtitle { color: var(--adm-muted); }
+
+/* ═══ Modales : en-tête et pied fixes, seul le contenu défile ═══════════
+   Règle unique pour toutes les familles (res-modal, res-drawer, em-modal,
+   modale UI, formulaires) : la boîte défile, l'en-tête reste collé en haut,
+   le pied (boutons) en bas. Un pied placé à l'intérieur d'un contenu avec
+   marge intérieure (--adm-pad) déborde de cette marge pour couvrir toute la
+   largeur. */
+body.adm .res-modal,
+body.adm .em-modal {
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.adm .em-modal-backdrop { align-items: center; }
+body.adm .em-modal-body { max-height: none; overflow: visible; --adm-pad: 28px; }
+body.adm .res-modal-body { --adm-pad: 24px; }
+body.adm .res-drawer-body { --adm-pad: 28px; }
+
+body.adm .adm-modal-header,
+body.adm .res-modal-header,
+body.adm .em-modal-header,
+body.adm .em-modal-head,
+body.adm .res-drawer-header {
+  position: sticky; top: 0; z-index: 20; background: var(--adm-surface);
+}
+/* Détail réservation : les onglets font partie de l'en-tête fixe. */
+body.adm .res-drawer-header { min-height: 64px; box-sizing: border-box; }
+body.adm .res-drawer .res-tabs {
+  position: sticky; top: 64px; z-index: 15; background: var(--adm-surface);
+  margin-left: calc(-1 * var(--adm-pad)); margin-right: calc(-1 * var(--adm-pad));
+  padding-left: var(--adm-pad); padding-right: var(--adm-pad);
+}
+
+body.adm .adm-modal-footer,
+body.adm .res-modal-actions,
+body.adm .cms-modal-footer,
+body.adm .qv-actions {
+  position: sticky; bottom: 0; z-index: 20;
+  display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+  background: var(--adm-surface); border-top: 1px solid var(--adm-line);
+  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.05);
+}
+/* Pied à l'intérieur d'un contenu à marge intérieure : pleine largeur, collé au bord. */
+body.adm .adm-modal-footer,
+body.adm .res-modal-body .res-modal-actions,
+body.adm .qv-actions {
+  margin: 20px calc(-1 * var(--adm-pad, 24px)) calc(-1 * var(--adm-pad, 24px));
+  padding: 14px var(--adm-pad, 24px);
+}
+/* Pied posé directement dans la boîte (à côté du contenu). */
+body.adm .res-modal > .res-modal-actions { margin: 0; padding: 14px 24px; }
+body.adm .em-modal > .cms-modal-footer { margin: 0; }

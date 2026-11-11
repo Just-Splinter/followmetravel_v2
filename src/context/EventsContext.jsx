@@ -6,16 +6,14 @@ import {
   useEffect,
 } from "react";
 
-import { Permission, Role } from "appwrite";
-import db, { Collections, ID } from "../services/database";
+import { ID } from "../services/database";
+import { API_URL } from "../services/api";
+import { contactKind, detectAcquisition } from "../services/acquisition";
 
-// Analytics events are written by every visitor, including anonymous ones —
-// creation can't be restricted at the document level (Appwrite only lets a
-// document's own permissions govern read/update/delete, not who's allowed
-// to create one; that's the collection's own "create" permission, which
-// must stay open). Read is admin-only, so no visitor can scrape another
-// session's tracked pages/clicks via a direct API call.
-const EVENT_PERMISSIONS = [Permission.read(Role.label("admin"))];
+// Analytics events are written by every visitor, including anonymous ones;
+// read is staff-only (api/src/collections/policies.ts), so no visitor can
+// scrape another session's tracked pages/clicks via a direct API call.
+// The dashboard's business view (api/src/analytics) excludes staff traffic.
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -42,9 +40,53 @@ function getSessionId() {
 /** Détecte grossièrement le type d'appareil */
 function detectDevice() {
   const ua = navigator.userAgent;
-  if (/Mobi|Android/i.test(ua)) return "mobile";
   if (/Tablet|iPad/i.test(ua)) return "tablet";
+  if (/Mobi|Android/i.test(ua)) return "mobile";
   return "desktop";
+}
+
+/**
+ * Provenance figée au premier événement de la session (premier contact) :
+ * une navigation interne ne doit pas la transformer en « direct ».
+ */
+function getAcquisition() {
+  const key = "mta_acquisition";
+  try {
+    const stored = sessionStorage.getItem(key);
+    if (stored) return JSON.parse(stored);
+  } catch {
+    /* sessionStorage indisponible : on recalcule */
+  }
+  const acq = {
+    ...detectAcquisition(window.location.search, document.referrer, window.location.host),
+    referrer: document.referrer ? document.referrer.slice(0, 300) : "",
+    landing: window.location.pathname,
+  };
+  try {
+    sessionStorage.setItem(key, JSON.stringify(acq));
+  } catch {
+    /* ignore */
+  }
+  return acq;
+}
+
+function getTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
+}
+
+/** Envoi groupé ; `keepalive` laisse partir la requête même si l'onglet se ferme. */
+function sendBatch(events) {
+  return fetch(`${API_URL}/v1/events/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Fmt-Client": "web" },
+    body: JSON.stringify({ events }),
+    credentials: "include",
+    keepalive: true,
+  }).catch(() => {});
 }
 
 // ─── Provider ────────────────────────────────────────────────────────────────
@@ -54,22 +96,16 @@ export function EventsProvider({ children }) {
   const timerRef  = useRef(null);         // référence au setInterval
   const sessionId = useRef(getSessionId());
   const device    = useRef(detectDevice());
+  const acquisition = useRef(getAcquisition());
+  const timeZone  = useRef(getTimeZone());
 
-  // ── Flush : envoie le contenu de la queue vers Appwrite ──────────────────
+  // ── Flush : un seul appel API pour tout le lot ───────────────────────────
 
-  const flush = useCallback(async () => {
-    if (queue.current.length === 0) return;
-
-    // Prend tout ce qui est en queue et vide immédiatement
-    const batch = queue.current.splice(0, queue.current.length);
-
-    // Envoie chaque event (Appwrite n'a pas de bulk-insert natif,
-    // on parallélise avec Promise.allSettled pour ne jamais bloquer)
-    await Promise.allSettled(
-      batch.map((event) =>
-        db.create(Collections.EVENTS, event, ID.unique(), EVENT_PERMISSIONS)
-      )
-    );
+  const flush = useCallback(() => {
+    // Lots de BATCH_SIZE au plus (limite de l'API).
+    while (queue.current.length > 0) {
+      sendBatch(queue.current.splice(0, BATCH_SIZE));
+    }
   }, []);
 
   const userIdRef = useRef(null);
@@ -83,15 +119,18 @@ export function EventsProvider({ children }) {
   useEffect(() => {
     timerRef.current = setInterval(flush, BATCH_INTERVAL_MS);
 
-    // Flush final quand l'onglet se ferme / change de page
+    // Flush final quand l'onglet passe en arrière-plan ou se ferme
+    // (pagehide : seul événement fiable sur mobile / Safari).
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") flush();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", flush);
 
     return () => {
       clearInterval(timerRef.current);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flush);
       flush(); // dernier flush au démontage
     };
   }, [flush]);
@@ -119,7 +158,11 @@ export function EventsProvider({ children }) {
         page,
         data:      JSON.stringify(data),
         device:    device.current,
-        country:   "MA",                // à remplacer par géoloc si besoin
+        // Fuseau du navigateur : distingue le Maroc de la clientèle MRE.
+        tz:        timeZone.current,
+        country:   timeZone.current === "Africa/Casablanca" ? "MA" : null,
+        lang:      document.documentElement.lang || navigator.language || "",
+        ...acquisition.current,
         createdAt: new Date().toISOString(),
       };
 
@@ -130,6 +173,28 @@ export function EventsProvider({ children }) {
     },
     [userIdRef, flush]
   );
+
+  // ── Contacts : tout lien téléphone / email / WhatsApp du site, sans avoir
+  //    à instrumenter chaque bouton (data-track-label précise le contexte).
+  useEffect(() => {
+    const onClick = (e) => {
+      const a = e.target?.closest?.("a[href]");
+      if (!a || window.location.pathname.startsWith("/dashboard")) return;
+      const kind = contactKind(a.getAttribute("href"));
+      if (!kind) return;
+      track({
+        event: "contact",
+        category: "contact",
+        action: kind,
+        label: a.dataset.trackLabel || a.textContent?.trim().slice(0, 80) || kind,
+        targetId: a.dataset.trackTarget || null,
+      });
+      // Le visiteur quitte souvent la page (appli téléphone / WhatsApp) : on envoie tout de suite.
+      flush();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [track, flush]);
 
   // ── Raccourcis sémantiques ────────────────────────────────────────────────
 
@@ -147,10 +212,10 @@ export function EventsProvider({ children }) {
     [track]
   );
 
-  /** Recherche effectuée */
+  /** Recherche effectuée (results : nombre de voyages trouvés, si connu) */
   const trackSearch = useCallback(
-    ({ label, action = "destination" }) =>
-      track({ event: "search", category: "search", action, label }),
+    ({ label, action = "destination", results }) =>
+      track({ event: "search", category: "search", action, label, data: results === undefined ? {} : { results } }),
     [track]
   );
 
@@ -168,10 +233,20 @@ export function EventsProvider({ children }) {
     [track]
   );
 
-  /** Début de réservation */
+  /** Ouverture du formulaire de réservation */
   const trackReserve = useCallback(
     ({ targetId, label, page }) =>
       track({ event: "click", category: "package", action: "reserve", targetId, label, page }),
+    [track]
+  );
+
+  /**
+   * Étape du formulaire de réservation : "travelers" (passage à la saisie des
+   * voyageurs), "submit" (envoi), "success", "error" (avec message).
+   */
+  const trackBookingStep = useCallback(
+    ({ targetId, label, step, data }) =>
+      track({ event: "booking_step", category: "funnel", action: step, targetId, label, data }),
     [track]
   );
 
@@ -182,10 +257,25 @@ export function EventsProvider({ children }) {
     [track]
   );
 
-  /** Paiement complété */
+  /** Demande de réservation envoyée (pas un paiement : aucun paiement en ligne). */
   const trackPayment = useCallback(
     ({ targetId, label, data }) =>
       track({ event: "payment", category: "funnel", action: "complete", targetId, label, data }),
+    [track]
+  );
+
+  /** Prospect : formulaire de contact, newsletter, demande de devis. */
+  const trackLead = useCallback(
+    ({ action, label }) => {
+      track({ event: "lead", category: "lead", action, label });
+      flush();
+    },
+    [track, flush]
+  );
+
+  /** Connexion / inscription réussie (method : email, google). */
+  const trackAuth = useCallback(
+    ({ action = "login", method }) => track({ event: "auth", category: "account", action, label: method }),
     [track]
   );
 
@@ -199,8 +289,11 @@ export function EventsProvider({ children }) {
     trackPackageView,
     trackFavorite,
     trackReserve,
+    trackBookingStep,
     trackAbandon,
     trackPayment,
+    trackLead,
+    trackAuth,
     setUserId,
     flush, // exposé si besoin de flush manuel
   };

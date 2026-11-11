@@ -1,7 +1,7 @@
 /* Content-side background only — the sidebar carries its own dark palette
-   (Sidebar.module.css), lifted from the marketing site's warm-paper system
+   (Sidebar.module.css); the content area uses the admin design system background (admin-theme.css)
    rather than the generic white/navy the dashboard used before. */
-.root { display: flex; height: 100vh; overflow: hidden; background: #f6f2ea; }
+.root { display: flex; height: 100vh; overflow: hidden; background: var(--adm-bg); }
 
 .main {
   flex: 1;
@@ -9,7 +9,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
-  background: #f6f2ea;
+  background: var(--adm-bg);
 }
 
 .header {

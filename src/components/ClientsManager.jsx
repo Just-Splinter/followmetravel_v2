@@ -4,7 +4,7 @@ import { useClients } from "../context/ClientsContext";
 import { mergeClients } from "../services/clients";
 import { DetailDrawer } from "./ReservationsManager";
 import { useInjectStyles as useInjectReservationStyles, STATUS_TRIGGER } from "../services/reservationShared";
-import { sendTriggerEmail, buildReservationParams } from "../services/emailSender";
+import { sendTriggerEmail } from "../services/emailSender";
 import AddClientModal from "./AddClientModal";
 import {
   Search, X, Users, Wallet, TrendingUp, Eye, Plus,
@@ -36,7 +36,7 @@ const CL_CSS = `
 .cl-search input { border: none; background: transparent; font-size: 13px; color: #1e293b; outline: none; flex: 1; padding: 10px 8px; font-family: inherit; }
 .cl-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
 .cl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.cl-table th { padding: 13px 16px; text-align: left; font-weight: 700; color: #64748b; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; border-bottom: 1.5px solid #e2e8f0; background: #fafafa; white-space: nowrap; }
+.cl-table th { padding: 13px 16px; text-align: left; font-weight: 700; color: #64748b; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; border-bottom: 1.5px solid #e2e8f0; background: #f8fafc; white-space: nowrap; }
 .cl-table td { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 .cl-row { cursor: pointer; transition: background .15s; }
 .cl-row:hover { background: rgba(255,117,14,.03); }
@@ -47,7 +47,7 @@ const CL_CSS = `
 .cl-total { font-weight: 800; color: #ff750e; font-size: 13px; }
 .cl-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .cl-empty { padding: 60px 20px; text-align: center; color: #94a3b8; }
-.cl-add-btn { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: 9px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700; border: none; background: linear-gradient(135deg,#ff750e,#ff8c3e); color: #fff; box-shadow: 0 2px 8px rgba(255,117,14,.25); white-space: nowrap; }
+.cl-add-btn { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: 9px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700; border: none; background: linear-gradient(135deg,#ff750e,#ff750e); color: #fff; box-shadow: 0 2px 8px rgba(255,117,14,.25); white-space: nowrap; }
 .cl-add-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255,117,14,.35); }
 
 .cl-drawer-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 1000; display: flex; justify-content: flex-end; }
@@ -236,11 +236,7 @@ export default function ClientsManager() {
 
       const triggerKey = STATUS_TRIGGER[newStatus];
       if (triggerKey) {
-        const updated = { ...res, status: newStatus, ...result };
-        sendTriggerEmail(triggerKey, {
-          params: buildReservationParams(updated),
-          targetEmails: [updated.userEmail].filter(Boolean),
-        });
+        sendTriggerEmail(triggerKey, { reservationId: id });
       }
     } catch {
       notify("Erreur lors du changement de statut");

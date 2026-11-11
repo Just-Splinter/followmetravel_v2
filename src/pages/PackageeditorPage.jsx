@@ -7,20 +7,21 @@ import { daysInMonth, parseDDMM, formatDDMM } from "../marketing/dates";
 import HotelPicker from "../components/HotelPicker";
 import { useClickOutside } from "../components/ClickOutSide";
 import StorageService from "../services/storage";
-import { roomTypesFor } from "../services/roomTypes";
+import { normLabel, roomTypesFor } from "../services/roomTypes";
 import { useHotels } from "../context/HotelsContext";
 import { toast } from "react-toastify";
 import {
   Save, Check, X, Plus, Upload,
   Eye, Image as ImageIcon,
-  Calendar, Hotel, List, Tag, Settings
+  Calendar, Hotel, List, Tag, Settings, Palette
 } from "lucide-react";
 
 import '../styles/PackageeditorPage.css'
+import { FORMULE_MODES, formuleMode, formuleNights } from "../services/formules";
 
 // ─── Palettes ─────────────────────────────────────────────────────
 const PALETTES = [
-  { id: "orange", label: "Orange Solaire", swatch: "#F59E42", theme: { gold: "#F59E42", goldLight: "#FFD8A8", dark: "#5E3B14", cream: "#FFF9F2", textDark: "#5A3712", textMuted: "#A06B35", navy: "#D97706", borderGold: "rgba(245,158,66,.22)" } },
+  { id: "orange", label: "Orange Solaire", swatch: "#ff750e", theme: { gold: "#ff750e", goldLight: "#fff4eb", dark: "#5E3B14", cream: "#FFF9F2", textDark: "#5A3712", textMuted: "#A06B35", navy: "#D97706", borderGold: "rgba(245,158,66,.22)" } },
   { id: "apricot", label: "Abricot", swatch: "#FFB36B", theme: { gold: "#FFB36B", goldLight: "#FFE3C2", dark: "#744116", cream: "#FFF8F0", textDark: "#6B3D14", textMuted: "#AE7C52", navy: "#F08C36", borderGold: "rgba(255,179,107,.25)" } },
   { id: "peach", label: "Pêche", swatch: "#FFBC99", theme: { gold: "#FFBC99", goldLight: "#FFE5D6", dark: "#734229", cream: "#FFF9F6", textDark: "#68361E", textMuted: "#A8755B", navy: "#F28B65", borderGold: "rgba(255,188,153,.24)" } },
   { id: "sand", label: "Sable", swatch: "#E8C98B", theme: { gold: "#E8C98B", goldLight: "#F9E9C8", dark: "#725C2C", cream: "#FFFDF8", textDark: "#5D491F", textMuted: "#A18A5B", navy: "#D4AF37", borderGold: "rgba(232,201,139,.25)" } },
@@ -264,7 +265,7 @@ function PaletteSidebar({ pkg, update, onClose }) {
 
   return (
     <div className="ed-palette-sidebar" style={{ "--ed-palette-width": `${width}px` }}>
-      <div className="ed-palette-close" onClick={onClose} title="Fermer">
+      <div className="ed-palette-close" onClick={onClose} title="Masquer les couleurs">
         <X size={24} color="white" />
       </div>
 
@@ -861,9 +862,8 @@ function DayItem({ day, isOpen, onToggle, onUpdate, onRemove, onUpdateActivity, 
   );
 }
 
-function hotelCategoryNights(category) {
-  return (category.hotels || []).reduce((sum, h) => sum + (Number(h.nights) || 0), 0);
-}
+// Séjour (une ville, hôtels au choix) : nuits du séjour ; circuit : somme des étapes.
+const hotelCategoryNights = formuleNights;
 
 // Fixed columns before the price columns start: "Hôtel", "Ville", "Nuits", "★".
 const priceColStart = 4;
@@ -957,7 +957,8 @@ function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, on
 
   const addHotel = () =>
     onUpdate("hotels", [...hotels, {
-      id: uid(), name: "Nouvel Hôtel", city: "", stars: 4, nights: 1,
+      // Nom vide : le sélecteur propose alors tout le catalogue d'hôtels.
+      id: uid(), name: "", city: "", stars: 4, nights: 1,
       cols: headers.slice(priceColStart).map(() => "0"),
       allotment: [], blockWhenFull: false,
     }]);
@@ -992,32 +993,38 @@ function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, on
     });
   };
 
-  // Picking a hotel that has its own room types "surcharges" (overrides)
-  // this formule's price columns with that list — every hotel row in the
-  // category shares one set of columns, so all of their cols/allotment get
-  // reset to match, not just the row being edited. The picked row is
-  // prefilled with that hotel's default prices; other rows reset to "0"
-  // since their price under these new columns isn't known. Sequential note
-  // above applies here too: tableHeaders + hotels must land in one update.
+  // Choix d'un hôtel du catalogue : la ligne est reliée (suivi de stock) et
+  // reçoit les tarifs par défaut de l'hôtel, colonne par colonne (types de
+  // chambre comparés par libellé). Rien n'est jamais effacé chez les autres
+  // hôtels de la formule : un type de chambre absent de la formule devient
+  // une colonne de plus, à 0 pour les autres lignes. Une seule mise à jour
+  // (tableHeaders + hotels), cf. la note sur les mises à jour successives.
   const applyHotelPick = (hotelRowId, { id, name, city, stars, roomTypes }) => {
+    // Saisie libre : le lien au catalogue tombe, le reste de la ligne est gardé.
+    if (!id) {
+      updateHotelFields(hotelRowId, { hotelId: null, name });
+      return;
+    }
+    const row = hotels.find((h) => h.id === hotelRowId) || {};
+    const priceHeaders = headers.slice(priceColStart);
+    const catalog = new Map((roomTypes || []).map((rt) => [normLabel(rt.type), String(rt.price ?? 0)]));
+    const missing = (roomTypes || []).map((rt) => rt.type).filter((t) => !priceHeaders.some((h) => normLabel(h) === normLabel(t)));
+    const newHeaders = [...priceHeaders, ...missing];
+    const fill = (labels, previous = []) => labels.map((l, i) => catalog.get(normLabel(l)) ?? previous[i] ?? "0");
+
+    onUpdateFields({
+      ...(missing.length ? { tableHeaders: [...headers.slice(0, priceColStart), ...newHeaders] } : {}),
+      hotels: hotels.map((h) =>
+        h.id === hotelRowId
+          ? { ...h, hotelId: id, name, city, stars, cols: fill(newHeaders, row.cols) }
+          : missing.length ? { ...h, cols: [...(h.cols || []), ...missing.map(() => "0")] } : h
+      ),
+    });
     if (roomTypes?.length) {
-      const newHeaders = roomTypes.map((rt) => rt.type);
-      const pickedCols = roomTypes.map((rt) => String(rt.price ?? 0));
-      const blankCols = roomTypes.map(() => "0");
-      onUpdateFields({
-        tableHeaders: [...headers.slice(0, priceColStart), ...newHeaders],
-        hotels: hotels.map(h =>
-          h.id === hotelRowId
-            ? { ...h, hotelId: id, name, city, stars, cols: pickedCols, allotment: [] }
-            : { ...h, cols: blankCols, allotment: [] }
-        ),
-      });
       toast.info(
-        `Colonnes de prix mises à jour depuis les types de « ${name} ».` +
-          (hotels.length > 1 ? " Les tarifs des autres hôtels de cette formule ont été réinitialisés." : "")
+        `Tarifs de « ${name} » repris du catalogue.` +
+          (missing.length ? ` Colonne(s) ajoutée(s) : ${missing.join(", ")} — tarifs des autres hôtels conservés.` : "")
       );
-    } else {
-      updateHotelFields(hotelRowId, { hotelId: id, name, city, stars });
     }
   };
 
@@ -1036,8 +1043,20 @@ function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, on
             <Field label="Prix de base" value={category.basePrice} onChange={v => onUpdate("basePrice", v)} />
           </div>
 
+          <div className="ed-field-row">
+            <div className="ed-field">
+              <label className="ed-field-label">Type de formule</label>
+              <select className="ed-input" value={category.mode || ""} onChange={e => onUpdate("mode", e.target.value)}>
+                {FORMULE_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            <Field label="Restauration" value={category.board || ""} placeholder="ex: Demi-pension" onChange={v => onUpdate("board", v)} />
+          </div>
+
           <div className="ed-gallery-hint">
-            Durée totale calculée automatiquement : <strong>{totalNights} Nuits / {totalNights + 1} Jours</strong>
+            {formuleMode(category) === "circuit"
+              ? <>Circuit : le groupe passe par chaque hôtel (une étape par ligne). Durée calculée : <strong>{totalNights} Nuits / {totalNights + 1} Jours</strong></>
+              : <>Séjour dans une ville : les hôtels sont au choix du client, chacun avec ses tarifs. Durée : <strong>{totalNights} Nuits / {totalNights + 1} Jours</strong></>}
           </div>
 
           <div className="ed-hotels-header-label" style={{ marginTop: 10 }}>Colonnes de prix</div>
@@ -1062,6 +1081,7 @@ function HotelCategoryItem({ category, packageId, isOpen, onToggle, onUpdate, on
               <div className="ed-hotel-row" style={{ flexWrap: "wrap" }}>
                 <HotelPicker
                   value={hotel.name}
+                  linked={!!hotel.hotelId}
                   onSelect={(picked) => applyHotelPick(hotel.id, picked)}
                   theme="dark"
                   inputClassName="ed-hotel-name-input"
@@ -1357,6 +1377,8 @@ function DatesEditor({ pkg, update }) {
       <div className="ed-gallery-hint">
         Fenêtre de départ, jour/mois sans année (valable chaque année). Les deux
         dates doivent être renseignées pour que l'entrée apparaisse sur le site.
+        Par date : supplément (ou réduction, négatif) par voyageur, nombre de
+        places vendables (vide = illimité), départ garanti, fermeture des ventes.
       </div>
       {dates.map(d => {
         const from = parseDDMM(d.from);
@@ -1375,6 +1397,26 @@ function DatesEditor({ pkg, update }) {
               />
               <RemoveBtn onClick={() => removeDate(d.id)} />
             </div>
+            <div className="ed-date-options">
+              <label>
+                Supplément / pers. (DH)
+                <input className="ed-input" type="number" step="50" value={d.supplement ?? ""} placeholder="0"
+                  onChange={(e) => updateDateFields(d.id, { supplement: e.target.value === "" ? undefined : Number(e.target.value) })} />
+              </label>
+              <label>
+                Places
+                <input className="ed-input" type="number" min="0" value={d.capacity ?? ""} placeholder="illimité"
+                  onChange={(e) => updateDateFields(d.id, { capacity: e.target.value === "" ? undefined : Number(e.target.value) })} />
+              </label>
+              <label className="ed-date-check">
+                <input type="checkbox" checked={!!d.guaranteed} onChange={(e) => updateDateFields(d.id, { guaranteed: e.target.checked })} />
+                Départ garanti
+              </label>
+              <label className="ed-date-check">
+                <input type="checkbox" checked={!!d.closed} onChange={(e) => updateDateFields(d.id, { closed: e.target.checked })} />
+                Ventes fermées
+              </label>
+            </div>
             {incomplete && (
               <div className="ed-date-warning error">
                 Date incomplète — n'apparaîtra pas sur le site tant qu'elle n'est pas complète.
@@ -1389,6 +1431,39 @@ function DatesEditor({ pkg, update }) {
         );
       })}
       <AddBtn label="Ajouter une date" onClick={addDate} />
+    </Accordion>
+  );
+}
+
+function CancellationEditor({ pkg, update }) {
+  const custom = Array.isArray(pkg.cancellationPolicy) && pkg.cancellationPolicy.length > 0;
+  const tiers = custom ? pkg.cancellationPolicy : [];
+  const setTier = (i, key, value) =>
+    update("cancellationPolicy", tiers.map((t, n) => (n === i ? { ...t, [key]: Number(value) || 0 } : t)));
+
+  return (
+    <Accordion title="Conditions d'annulation" icon={<Calendar size={14} />}>
+      <div className="ed-gallery-hint">
+        Par défaut, ce package applique les conditions de la fiche agence (Paramètres → Agence).
+        Personnalisez-les ici si ce voyage a ses propres règles (billets non remboursables, haute saison…).
+      </div>
+      {!custom ? (
+        <AddBtn label="Définir des conditions propres à ce package" onClick={() => update("cancellationPolicy", [
+          { daysBefore: 30, feePercent: 10 }, { daysBefore: 15, feePercent: 30 }, { daysBefore: 0, feePercent: 100 },
+        ])} />
+      ) : (
+        <>
+          {tiers.map((t, i) => (
+            <div key={i} className="ed-date-options">
+              <label>À partir de (jours avant)<input className="ed-input" type="number" min="0" value={t.daysBefore} onChange={(e) => setTier(i, "daysBefore", e.target.value)} /></label>
+              <label>Frais (%)<input className="ed-input" type="number" min="0" max="100" value={t.feePercent} onChange={(e) => setTier(i, "feePercent", e.target.value)} /></label>
+              <RemoveBtn onClick={() => update("cancellationPolicy", tiers.filter((_, n) => n !== i))} />
+            </div>
+          ))}
+          <AddBtn label="Ajouter un palier" onClick={() => update("cancellationPolicy", [...tiers, { daysBefore: 0, feePercent: 100 }])} />
+          <AddBtn label="Revenir aux conditions de l'agence" onClick={() => update("cancellationPolicy", [])} />
+        </>
+      )}
     </Accordion>
   );
 }
@@ -1448,6 +1523,7 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
   }] : []);
   const [selectedId] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [chatMode] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const selected = packages.find(p => p.id === selectedId);
@@ -1490,8 +1566,9 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
 
   return (
     <div className="ed-root">
-      {!previewMode && selected && (
-        <PaletteSidebar pkg={selected} update={update} onClose={onClose} />
+      {/* Palette de couleurs masquée par défaut ; « Couleurs » l'affiche. */}
+      {!previewMode && selected && paletteOpen && (
+        <PaletteSidebar pkg={selected} update={update} onClose={() => setPaletteOpen(false)} />
       )}
 
       <div className={`ed-preview-panel ${previewMode ? "fullscreen" : ""}`}>
@@ -1506,10 +1583,19 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
         {!previewMode && (
           <div className="ed-preview-toolbar">
             <span className="ed-preview-toolbar-label">Aperçu</span>
-            <button className="ed-fullscreen-btn" onClick={() => setPreviewMode(true)}>
-              <Eye size={13} />
-              Plein écran
-            </button>
+            <div className="ed-preview-toolbar-actions">
+              <button className={`ed-toolbar-btn ${paletteOpen ? "active" : ""}`} onClick={() => setPaletteOpen((v) => !v)} title="Couleurs de la fiche">
+                <Palette size={13} />
+                Couleurs
+              </button>
+              <button className="ed-fullscreen-btn" onClick={() => setPreviewMode(true)}>
+                <Eye size={13} />
+                Plein écran
+              </button>
+              <button className="ed-toolbar-btn ed-toolbar-close" onClick={onClose} title="Fermer l'éditeur" aria-label="Fermer l'éditeur">
+                <X size={15} />
+              </button>
+            </div>
           </div>
         )}
         <div className="ed-preview-container">
@@ -1573,6 +1659,7 @@ export default function PackageEditorPage({ pkg, onSave, onClose }) {
               <HotelsEditor pkg={selected} packageId={pkg.$id} update={update} />
               <SupplimentsCard pkg={selected} update={update} />
               <DatesEditor pkg={selected} update={update} />
+              <CancellationEditor pkg={selected} update={update} />
               <TabsEditor pkg={selected} update={update} />
             </>
           )}

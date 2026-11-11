@@ -1,0 +1,151 @@
+# MinIO — remplace le bucket Appwrite Storage (images des packages, hôtels,
+# hero slides). L'API S3 est exposée publiquement sur s3-followmetravel pour
+# que les visiteurs chargent les images ; la console (9001) reste interne :
+#   kubectl -n followmetravel port-forward svc/minio 9001:9001
+#
+# Image : pgsty/minio (fork maintenu par Pigsty). MinIO Inc. ne publie plus
+# d'images publiques — quay.io/minio et docker.io/minio renvoient 401.
+#
+# Identifiants dans le Secret `minio-credentials` (créé hors git, voir README.md).
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app: minio
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  labels:
+    app: minio
+spec:
+  serviceName: minio
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - name: s3
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef: { name: minio-credentials, key: MINIO_ROOT_USER }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-credentials, key: MINIO_ROOT_PASSWORD }
+            # URLs publiques correctes dans les presigned URLs générées par l'API.
+            - name: MINIO_SERVER_URL
+              value: https://s3-followmetravel.oneiro-lego.com
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: 9000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: 9000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Uploads d'images depuis le dashboard (et la migration depuis Appwrite).
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [s3-followmetravel.oneiro-lego.com]
+      secretName: minio-tls
+  rules:
+    - host: s3-followmetravel.oneiro-lego.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port: { name: s3 }
+---
+# Crée le bucket et rend ses objets lisibles anonymement (images publiques du
+# site) — GetObject seulement : `mc anonymous set download` ajouterait aussi
+# s3:ListBucket, qui laisserait n'importe qui énumérer tout le bucket.
+# Idempotent : peut être relancé sans risque (supprimer le Job avant de le ré-appliquer).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket-init
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              until mc alias set fmt http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 3; done
+              mc mb --ignore-existing "fmt/$BUCKET"
+              cat > /tmp/policy.json <<POLICY
+              {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::$BUCKET/*"]}]}
+              POLICY
+              mc anonymous set-json /tmp/policy.json "fmt/$BUCKET"
+              mc anonymous get-json "fmt/$BUCKET"
+          env:
+            - name: BUCKET
+              value: followmetravel
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef: { name: minio-credentials, key: MINIO_ROOT_USER }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: minio-credentials, key: MINIO_ROOT_PASSWORD }

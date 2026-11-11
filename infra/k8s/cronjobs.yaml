@@ -1,0 +1,137 @@
+# Tâches planifiées (heure de Casablanca).
+#
+# Sauvegardes : volume `backups` sur le même nœud — protège d'une erreur de
+# manipulation ou d'une corruption, PAS d'une perte du serveur. Copier
+# régulièrement ce volume ailleurs (voir README.md, « Sauvegardes »).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi
+---
+# Base de données : dump compressé chaque nuit, 14 jours conservés.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "30 2 * * *"
+  timeZone: "Africa/Casablanca"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-dump
+              image: postgres:17.6-alpine
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  mkdir -p /backups/postgres
+                  file="/backups/postgres/followmetravel-$(date +%Y-%m-%d-%H%M).sql.gz"
+                  pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner | gzip -9 > "$file.tmp"
+                  mv "$file.tmp" "$file"
+                  find /backups/postgres -name '*.sql.gz' -mtime +14 -delete
+                  ls -lh /backups/postgres | tail -5
+              env:
+                - name: POSTGRES_USER
+                  valueFrom: { secretKeyRef: { name: postgres-credentials, key: POSTGRES_USER } }
+                - name: POSTGRES_DB
+                  valueFrom: { secretKeyRef: { name: postgres-credentials, key: POSTGRES_DB } }
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: postgres-credentials, key: POSTGRES_PASSWORD } }
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: backups
+---
+# Images (bucket MinIO) : copie miroir chaque nuit (les fichiers supprimés du
+# bucket restent dans la copie).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: media-backup
+spec:
+  schedule: "0 3 * * *"
+  timeZone: "Africa/Casablanca"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mirror
+              image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  mc alias set src http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
+                  mkdir -p /backups/media
+                  mc mirror --overwrite --quiet src/followmetravel /backups/media
+                  du -sh /backups/media
+              env:
+                - name: MINIO_ROOT_USER
+                  valueFrom: { secretKeyRef: { name: minio-credentials, key: MINIO_ROOT_USER } }
+                - name: MINIO_ROOT_PASSWORD
+                  valueFrom: { secretKeyRef: { name: minio-credentials, key: MINIO_ROOT_PASSWORD } }
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: backups
+---
+# Relances de paiement : chaque matin, l'API envoie les rappels d'échéance
+# et relances de retard (règles : Paramètres → Agence).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: payment-reminders
+spec:
+  schedule: "0 8 * * *"
+  timeZone: "Africa/Casablanca"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: trigger
+              image: curlimages/curl:8.16.0
+              command:
+                - sh
+                - -c
+                - >-
+                  curl -fsS -X POST
+                  -H "X-Cron-Token: $CRON_TOKEN"
+                  -H "X-Fmt-Client: cron"
+                  http://api:3000/v1/jobs/payment-reminders
+              env:
+                - name: CRON_TOKEN
+                  valueFrom: { secretKeyRef: { name: api-env, key: CRON_TOKEN } }
