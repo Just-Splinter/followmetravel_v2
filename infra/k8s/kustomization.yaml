@@ -13,4 +13,4 @@ resources:
 images:
   - name: followmetravel/api
     newName: hamzashoul/followmetravel-api
-    newTag: "0.7.1"
+    newTag: "0.8.0"
